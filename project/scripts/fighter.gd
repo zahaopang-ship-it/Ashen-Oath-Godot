@@ -36,6 +36,9 @@ var hit_reaction_timer := 0.0
 var hit_reaction_duration := 0.18
 var hit_flash_timer := 0.0
 var _body_material: StandardMaterial3D
+var _upper_body: Node3D
+var _weapon_pivot: Node3D
+var _combat_anim_time := 0.0
 var ai_timer := 0.8
 var gravity := 22.0
 var attack_kind := "slash"
@@ -57,6 +60,7 @@ const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
+		_update_combat_animation(delta)
 		velocity = Vector3.ZERO
 		return
 	deflect_timer = maxf(0.0, deflect_timer - delta)
@@ -83,6 +87,7 @@ func _physics_process(delta: float) -> void:
 	if not is_blocking and state not in [CombatState.WINDUP, CombatState.ACTIVE, CombatState.RECOVERY, CombatState.POSTURE_BROKEN]:
 		var vitality_factor := lerpf(0.35, 1.0, clampf(vitality / maxf(1.0, max_vitality), 0.0, 1.0))
 		posture = maxf(0.0, posture - 8.0 * vitality_factor * delta)
+	_update_combat_animation(delta)
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 	else:
@@ -118,6 +123,82 @@ func set_body_material(material: StandardMaterial3D) -> void:
 	_body_material = material
 	if _body_material:
 		_body_material.set_meta("base_color", _body_material.albedo_color)
+
+func set_animation_rig(upper_body: Node3D, weapon_pivot: Node3D) -> void:
+	_upper_body = upper_body
+	_weapon_pivot = weapon_pivot
+
+func _update_combat_animation(delta: float) -> void:
+	_combat_anim_time += delta
+	if not is_instance_valid(_upper_body) or not is_instance_valid(_weapon_pivot):
+		return
+	var body_pose := Vector3(0.0, 0.0, 0.0)
+	var weapon_pose := Vector3(0.0, 0.0, -0.18)
+	var body_offset := Vector3.ZERO
+	var weight := 1.0 - exp(-18.0 * delta)
+	if state == CombatState.WINDUP:
+		var duration: float = float(ATTACK_WINDUP.get(attack_kind, WINDUP_TIME))
+		var progress := 1.0 - clampf(attack_timer / duration, 0.0, 1.0)
+		var anticipation := sin(progress * PI * 0.5)
+		match attack_kind:
+			"slash":
+				body_pose = Vector3(-0.12, 0.0, -0.10) * anticipation
+				weapon_pose = Vector3(-1.15, 0.0, -0.75) * anticipation
+			"thrust":
+				body_pose = Vector3(0.08, 0.0, 0.16) * anticipation
+				weapon_pose = Vector3(0.05, 0.0, 0.95) * anticipation
+			"sweep":
+				body_pose = Vector3(0.42, 0.0, -0.18) * anticipation
+				weapon_pose = Vector3(1.0, 0.0, -1.0) * anticipation
+			"heavy":
+				body_pose = Vector3(-0.48, 0.0, -0.16) * anticipation
+				weapon_pose = Vector3(-1.85, 0.0, -0.45) * anticipation
+	elif state == CombatState.ACTIVE:
+		var progress := 1.0 - clampf(attack_timer / ACTIVE_TIME, 0.0, 1.0)
+		var follow := sin(progress * PI)
+		match attack_kind:
+			"slash":
+				body_pose = Vector3(0.12, 0.0, 0.48) * follow
+				weapon_pose = Vector3(1.25, 0.0, 1.25) * follow
+			"thrust":
+				body_pose = Vector3(-0.12, 0.0, -0.24) * follow
+				weapon_pose = Vector3(-0.08, 0.0, -0.25) * follow
+			"sweep":
+				body_pose = Vector3(-0.12, 0.0, 0.58) * follow
+				weapon_pose = Vector3(-1.0, 0.0, 1.4) * follow
+			"heavy":
+				body_pose = Vector3(0.22, 0.0, 0.65) * follow
+				weapon_pose = Vector3(1.75, 0.0, 1.0) * follow
+	elif state == CombatState.RECOVERY:
+		body_pose = Vector3(0.08, 0.0, 0.08)
+		weapon_pose = Vector3(0.18, 0.0, -0.10)
+	elif state == CombatState.HITSTUN:
+		body_pose = Vector3(-0.42, 0.0, 0.0)
+		weapon_pose = Vector3(0.55, 0.0, 0.3)
+		body_offset = Vector3(0.0, 0.0, 0.12)
+	elif state == CombatState.POSTURE_BROKEN:
+		body_pose = Vector3(0.62 + sin(_combat_anim_time * 13.0) * 0.06, 0.0, 0.0)
+		weapon_pose = Vector3(0.85, 0.0, 0.0)
+	elif state == CombatState.DEAD:
+		body_pose = Vector3(1.35, 0.0, 0.0)
+		weapon_pose = Vector3(0.4, 0.0, 0.0)
+	elif is_blocking:
+		body_pose = Vector3(-0.08, 0.0, 0.0)
+		weapon_pose = Vector3(-0.42, 0.0, -0.32)
+	elif is_dodging:
+		body_pose = Vector3(0.25, 0.0, 0.0)
+	elif is_mikiri_countering:
+		body_pose = Vector3(-0.16, 0.0, 0.0)
+		weapon_pose = Vector3(-0.28, 0.0, -0.5)
+	elif is_sweep_evading:
+		body_pose = Vector3(0.35, 0.0, 0.0)
+		weapon_pose = Vector3(-0.35, 0.0, -0.2)
+	else:
+		body_pose = Vector3(0.025 * sin(_combat_anim_time * 2.4), 0.0, 0.025 * sin(_combat_anim_time * 1.7))
+		weapon_pose = Vector3(0.0, 0.0, -0.18 + 0.035 * sin(_combat_anim_time * 2.0))
+	_upper_body.rotation = _upper_body.rotation.lerp(body_pose, weight)
+	_upper_body.position = _upper_body.position.lerp(Vector3(0.0, 0.0, 0.0) + body_offset, weight)
+	_weapon_pivot.rotation = _weapon_pivot.rotation.lerp(weapon_pose, weight)
 
 func _begin_hit_reaction(attacker: Node3D) -> void:
 	if state == CombatState.POSTURE_BROKEN or is_dead:

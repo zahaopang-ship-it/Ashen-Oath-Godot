@@ -74,7 +74,7 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - [x] Deflect window (200 ms), post-deflect lockout, held-guard fallback, and posture pressure.
 - [x] Posture threshold enters a timed broken state; vitality-dependent posture recovery.
 - [x] Independent touch pointer tracking for movement, camera, and action-button fingers; keyboard debug controls (WASD/J/K/L/Space).
-- [x] Headless combat logic suite: 25 assertions passing.
+- [x] Headless combat logic suite: 39 assertions passing (including procedural pose-state checks).
 - [ ] Validate simultaneous touch on a physical Android device; headless tests cannot prove touch-driver behavior.
 - [x] Add a visible pulsing enemy windup marker and light camera impact feedback on confirmed hits.
 - [x] Add short directional hitstun/recoil and a temporary material flash for unblocked hits.
@@ -82,8 +82,10 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Gate: test matrix for all input combinations and combat outcomes; do not close M1 until physical multitouch is exercised.
 
 ### M2 — Combat depth
-- Attack chains, input buffering, Mikiri, sweep jump/stomp, dodge/grab.
-- Hit reactions, hitstop, camera impulse, impact audio.
+- [x] Attack classes and counter windows: slash, thrust/Mikiri, sweep/jump, and heavy.
+- [x] Procedural combat pose foundation: attack anticipation/follow-through, guard, hitstun, posture break, and death.
+- [ ] Attack chains, input buffering, stomp, dodge/grab.
+- [ ] Hitstop, camera impulse polish, and impact audio.
 - Enemy archetypes and combat state machine.
 - Gate: no stuck states; each attack type has a valid counter and punish path.
 
@@ -123,3 +125,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added dedicated mobile HUD actions and keyboard shortcuts for Mikiri and jump.
 - Headless combat suite: 34/34 assertions passed; editor import and main-scene smoke run completed successfully.
 - Still prototype scope: no animation-driven hitboxes, production character assets, Android device test, or APK in this milestone.
+
+
+## M2 — Procedural combat pose animation foundation
+- Reparented the capsule body, head, and blade under upper-body and weapon pivots so the fighter has controllable articulation points.
+- Added attack-specific anticipation and follow-through poses for slash, thrust, sweep, and heavy attacks, driven directly by windup/active timers.
+- Added guard, dodge, Mikiri, sweep-jump, hitstun, posture-break, death, and idle pose responses.
+- Added headless assertions for heavy anticipation, active follow-through, guard pose, hit reaction, and death collapse pose.
+- This is procedural pose animation on primitive meshes, not a skeletal animation asset or a replacement for authored animation clips.

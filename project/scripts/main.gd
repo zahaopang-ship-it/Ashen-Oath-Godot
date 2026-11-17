@@ -77,6 +77,9 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	collision.shape = capsule
 	collision.position.y = 0.9
 	body.add_child(collision)
+	var upper_body := Node3D.new()
+	upper_body.name = "UpperBodyPivot"
+	body.add_child(upper_body)
 	var mesh := MeshInstance3D.new()
 	var capsule_mesh := CapsuleMesh.new()
 	capsule_mesh.radius = 0.42
@@ -88,7 +91,7 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	mat.roughness = 0.82
 	mesh.name = "BodyMesh"
 	mesh.material_override = mat
-	body.add_child(mesh)
+	upper_body.add_child(mesh)
 	body.set_body_material(mat)
 	var head := MeshInstance3D.new()
 	var head_mesh := SphereMesh.new()
@@ -97,18 +100,23 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	head.mesh = head_mesh
 	head.position.y = 1.95
 	head.material_override = mat
-	body.add_child(head)
+	upper_body.add_child(head)
+	var weapon_pivot := Node3D.new()
+	weapon_pivot.name = "WeaponPivot"
+	weapon_pivot.position = Vector3(0.42, 1.18, -0.05)
+	upper_body.add_child(weapon_pivot)
 	var blade := MeshInstance3D.new()
 	var blade_mesh := BoxMesh.new()
 	blade_mesh.size = Vector3(0.07, 0.9, 0.10)
 	blade.mesh = blade_mesh
-	blade.position = Vector3(0.48, 1.05, -0.05)
+	blade.position = Vector3(0.0, 0.43, 0.0)
 	blade.rotation.z = -0.25
 	var blade_mat := StandardMaterial3D.new()
 	blade_mat.albedo_color = Color(0.72, 0.78, 0.82)
 	blade_mat.metallic = 0.78
 	blade.material_override = blade_mat
-	body.add_child(blade)
+	weapon_pivot.add_child(blade)
+	body.set_animation_rig(upper_body, weapon_pivot)
 	return body
 
 func _create_telegraph_marker() -> void:

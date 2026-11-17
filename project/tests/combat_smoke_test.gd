@@ -92,12 +92,39 @@ func _run() -> void:
 	_check(is_equal_approx(heavy_guard.posture, 39.1), "heavy guard causes increased posture damage")
 	_check(not heavy_guard.start_attack("invalid"), "unknown attack kinds are rejected")
 
+	var animated := _new_fighter("Animated", Vector3.ZERO)
+	var upper := Node3D.new()
+	var weapon := Node3D.new()
+	animated.add_child(upper)
+	upper.add_child(weapon)
+	animated.set_animation_rig(upper, weapon)
+	animated.start_attack("heavy")
+	animated.attack_timer = 0.31
+	animated.call("_update_combat_animation", 0.05)
+	_check(absf(weapon.rotation.x) > 0.01, "heavy windup drives weapon anticipation pose")
+	animated.state = 2
+	animated.attack_timer = 0.05
+	animated.call("_update_combat_animation", 0.05)
+	_check(absf(upper.rotation.z) > 0.01, "active heavy attack drives body follow-through")
+	animated.state = 0
+	animated.is_blocking = true
+	for frame in range(5):
+		animated.call("_update_combat_animation", 0.05)
+	_check(weapon.rotation.x < -0.05, "guard state drives a defensive weapon pose")
+	animated.is_blocking = false
+	animated.state = 6
+	animated.call("_update_combat_animation", 0.05)
+	_check(upper.rotation.x < -0.05, "hitstun state drives a hit reaction pose")
+	animated._die()
+	animated.call("_update_combat_animation", 0.05)
+	_check(upper.rotation.x > 0.05, "death state drives a collapse pose")
+
 	var dodger := _new_fighter("Dodger", Vector3.ZERO)
 	dodger.dodge()
 	_check(dodger.is_dodging, "dodge grants an active evasion window")
 	_check(dodger.receive_strike(20.0, 20.0, attacker) == "evaded", "dodge window evades incoming strike")
 
-	print("Combat tests: ", 34 - failures.size(), "/34 passed")
+	print("Combat tests: ", 39 - failures.size(), "/39 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:
