@@ -516,14 +516,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_N: player.try_vertical_climb()
 			KEY_COMMA: player.stop_vertical_climb()
 			KEY_PERIOD: player.try_ledge_grab()
-			KEY_PAGEUP: player.swim_vertical_input = 1.0
-			KEY_PAGEDOWN: player.swim_vertical_input = -1.0
+			KEY_PAGEUP: player.set_swim_vertical_input(1.0)
+			KEY_PAGEDOWN: player.set_swim_vertical_input(-1.0)
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:
 		if event.keycode == KEY_K: player.end_deflect()
 		if event.keycode == KEY_L: player.end_block()
-		if event.keycode in [KEY_PAGEUP, KEY_PAGEDOWN]: player.swim_vertical_input = 0.0
+		if event.keycode in [KEY_PAGEUP, KEY_PAGEDOWN]: player.set_swim_vertical_input(0.0)
 	var move := Vector2.ZERO
 	if Input.is_key_pressed(KEY_A): move.x -= 1.0
 	if Input.is_key_pressed(KEY_D): move.x += 1.0

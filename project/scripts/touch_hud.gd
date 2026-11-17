@@ -91,11 +91,9 @@ func _build_ui() -> void:
 	_register_action("LEDGE", Vector2(-95, -410), "ledge", Color(0.38, 0.42, 0.28))
 	_register_action("SWIM UP", Vector2(-475, -410), "swim_up", Color(0.12, 0.42, 0.62))
 	_register_action("SWIM DOWN", Vector2(-585, -410), "swim_down", Color(0.12, 0.34, 0.52))
-	_register_action("SURFACE", Vector2(-195, -490), "swim_up", Color(0.12, 0.42, 0.52))
-	_register_action("DIVE", Vector2(-95, -490), "swim_down", Color(0.12, 0.30, 0.42))
 	var hint := Label.new()
 	hint.text = "C CROUCH  /  V VAULT  /  M CLIMB  /  H WALL-HUG  /  B COVER-TO-COVER"
-	hint.text = "G GRAPPLE  /  N CLIMB WALL  /  , DROP  /  . LEDGE GRAB  /  SURFACE + DIVE"
+	hint.text = "G GRAPPLE  /  N CLIMB WALL  /  , DROP  /  . LEDGE GRAB  /  SWIM UP + DOWN"
 	hint.position = Vector2(28, 154)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -207,8 +205,6 @@ func _action_down(action: String) -> void:
 			if game.player.is_climbing: game.player.stop_vertical_climb()
 			else: game.player.try_vertical_climb()
 		"ledge": game.player.try_ledge_grab()
-		"swim_up": game.player.swim_vertical_input = 1.0
-		"swim_down": game.player.swim_vertical_input = -1.0
 		"swim_up": game.player.set_swim_vertical_input(1.0)
 		"swim_down": game.player.set_swim_vertical_input(-1.0)
 

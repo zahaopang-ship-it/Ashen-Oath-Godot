@@ -1485,6 +1485,9 @@ func exit_water() -> void:
 		body_collision.position.y = 0.9
 
 func try_vertical_climb() -> bool:
+	if is_climbing:
+		stop_vertical_climb()
+		return true
 	if not is_player or is_dead or state != CombatState.FREE or is_swimming or is_grappling or is_vaulting or is_wall_hugging:
 		return false
 	var forward := -global_transform.basis.z.normalized()
@@ -1525,6 +1528,11 @@ func _update_vertical_climb(delta: float) -> void:
 	var vertical := -input_move.y
 	velocity = Vector3.UP * vertical * climb_speed - _climb_normal * 0.35
 	move_and_slide()
+	if vertical > 0.0:
+		var top_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.9 + _climb_normal * 0.2, global_position + Vector3.UP * 1.9 - _climb_normal * 0.85)
+		top_query.exclude = [get_rid()]
+		if get_world_3d().direct_space_state.intersect_ray(top_query).is_empty():
+			stop_vertical_climb()
 
 func try_ledge_grab() -> bool:
 	if not is_player or is_dead or is_on_floor() or is_swimming or is_grappling or is_climbing or is_ledge_hanging or state != CombatState.FREE:
@@ -1558,7 +1566,7 @@ func try_ledge_grab() -> bool:
 func _update_ledge_hang(_delta: float) -> void:
 	velocity = Vector3.ZERO
 	if input_move.y < -0.45:
-		var landing := _ledge_hang_position - _climb_normal * 0.9 + Vector3.UP * 1.05
+		var landing := _ledge_hang_position + _climb_normal * 0.9 + Vector3.UP * 1.05
 		var query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.0, landing + Vector3.DOWN * 3.0)
 		query.exclude = [get_rid()]
 		var hit := get_world_3d().direct_space_state.intersect_ray(query)

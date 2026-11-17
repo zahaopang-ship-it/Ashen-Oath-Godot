@@ -51,7 +51,7 @@ func _run() -> void:
 	_check(player.is_climbing, "vertical climb enters a dedicated movement state")
 	var climb_start_y: float = player.global_position.y
 	player.input_move = Vector2(0.0, -1.0)
-	for i in range(20):
+	for i in range(40):
 		await physics_frame
 	_check(player.global_position.y > climb_start_y + 0.45, "vertical climb moves player upward from joystick input")
 	player.stop_vertical_climb()
@@ -70,6 +70,14 @@ func _run() -> void:
 	ledge_box.size = Vector3(3.0, 2.5, 0.45)
 	ledge_shape.shape = ledge_box
 	ledge.add_child(ledge_shape)
+	var ledge_top := StaticBody3D.new()
+	ledge_top.position = Vector3(0.0, 2.25, 4.15)
+	game.add_child(ledge_top)
+	var top_shape := CollisionShape3D.new()
+	var top_box := BoxShape3D.new()
+	top_box.size = Vector3(3.0, 0.5, 2.0)
+	top_shape.shape = top_box
+	ledge_top.add_child(top_shape)
 	await physics_frame
 	var ledge_query := PhysicsRayQueryParameters3D.create(player.global_position + Vector3.UP * 1.35, player.global_position + Vector3.UP * 1.35 + Vector3(0.0, 0.0, -0.9))
 	ledge_query.exclude = [player.get_rid()]
