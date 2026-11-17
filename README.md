@@ -13,7 +13,8 @@ Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-i
 - Swimming, vertical climbing, ledge hanging/mantling, jump gating, grapple targeting/arcing movement, and aerial grapple follow-up are isolated in scripts/traversal/fighter_traversal_controller.gd.
 - Shuriken, firecracker, axe, umbrella costs/effects, lightning reversal, and prosthetic upgrades are isolated in scripts/prosthetics/fighter_prosthetic_controller.gd.
 - Rest shrines, checkpoints, secret-cache rewards, and resurrection are isolated in scripts/exploration/fighter_exploration_controller.gd.
-- main.gd now focuses on encounter orchestration, combat feedback, camera/input orchestration, and connecting runtime systems. The 1,394-line fighter controller remains the largest architectural hotspot; combat, AI/stealth, traversal, prosthetics, and animation need further extraction.
+- Strike reception, deflect/mikiri/sweep outcomes, hit reactions, posture-break transitions, and death transitions are isolated in scripts/combat/fighter_combat_resolution.gd.
+- main.gd now focuses on encounter orchestration, combat feedback, camera/input orchestration, and connecting runtime systems. The 1,300-line fighter controller remains the largest architectural hotspot; combat, AI/stealth, traversal, prosthetics, and animation need further extraction.
 
 ## Current milestone
 - Godot 4.7.2 mobile-first 3D action prototype with Vitality/Posture combat, buffered combos, deflects, Mikiri/sweep counters, hitstop, and a two-phase boss.

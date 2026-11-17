@@ -6,6 +6,8 @@ const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
 const TRAVERSAL_CONTROLLER = preload("res://scripts/traversal/fighter_traversal_controller.gd")
 const PROSTHETIC_CONTROLLER = preload("res://scripts/prosthetics/fighter_prosthetic_controller.gd")
 const EXPLORATION_CONTROLLER = preload("res://scripts/exploration/fighter_exploration_controller.gd")
+const LOCOMOTION_CONTROLLER = preload("res://scripts/movement/fighter_locomotion_controller.gd")
+const COMBAT_RESOLUTION = preload("res://scripts/combat/fighter_combat_resolution.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -603,126 +605,15 @@ func _update_combat_animation(delta: float) -> void:
 		_right_elbow_pivot.rotation.x = lerpf(_right_elbow_pivot.rotation.x, right_elbow_bend, weight)
 
 func _begin_hit_reaction(attacker: Node3D, incoming_kind: String = "slash") -> void:
-	if state == CombatState.POSTURE_BROKEN or is_dead:
-		return
-	hit_reaction_kind = incoming_kind
-	hit_reaction_duration = 0.34 if incoming_kind in ["heavy", "ashen_rend"] else (0.25 if incoming_kind in ["thrust", "sweep", "grab"] else 0.18)
-	state = CombatState.HITSTUN
-	hit_reaction_timer = hit_reaction_duration
-	hit_flash_timer = 0.12 if incoming_kind in ["slash", "thrust"] else 0.18
-	if is_instance_valid(attacker):
-		var away := global_position - attacker.global_position
-		away.y = 0.0
-		if away.length_squared() > 0.001:
-			away = away.normalized()
-			_hit_reaction_side = signf(global_transform.basis.x.dot(away))
-			if is_zero_approx(_hit_reaction_side):
-				_hit_reaction_side = 1.0
-			var knockback := 5.0 if incoming_kind in ["heavy", "ashen_rend"] else (2.2 if incoming_kind == "thrust" else 3.4)
-			velocity.x = away.x * knockback
-			velocity.z = away.z * knockback
+	COMBAT_RESOLUTION.begin_hit_reaction(self, attacker, incoming_kind)
+
 
 func _player_update(delta: float) -> void:
-	if is_swimming:
-		is_sprinting = false
-		sprint_requested = false
-		return
-	if is_vaulting:
-		return
-	if state != CombatState.FREE:
-		velocity.x = move_toward(velocity.x, 0.0, movement_braking * delta)
-		velocity.z = move_toward(velocity.z, 0.0, movement_braking * delta)
-		return
-	var move_dir := _get_player_move_direction()
-	if is_cover_transferring:
-		if not is_instance_valid(_cover_transfer_target):
-			is_cover_transferring = false
-		else:
-			var transfer_goal: Vector3 = _cover_transfer_detour if _cover_transfer_detouring else _cover_transfer_target.global_position
-			var transfer_offset := transfer_goal - global_position
-			transfer_offset.y = 0.0
-			if transfer_offset.length() <= (0.38 if _cover_transfer_detouring else 0.52):
-				if _cover_transfer_detouring:
-					_cover_transfer_detouring = false
-					_cover_transfer_detour = Vector3.ZERO
-				else:
-					is_cover_transferring = false
-					_cover_transfer_target = null
-					velocity.x = 0.0
-					velocity.z = 0.0
-			else:
-				move_dir = transfer_offset.normalized()
-				var probe_motion := move_dir * minf(0.22, transfer_offset.length())
-				if test_move(global_transform, probe_motion):
-					if not _cover_transfer_detouring:
-						var side := Vector3(-move_dir.z, 0.0, move_dir.x)
-						if test_move(global_transform, side * 0.45):
-							side = -side
-						if test_move(global_transform, side * 0.45):
-							_cancel_cover_transfer()
-						else:
-							_cover_transfer_detour = global_position + side * 1.9
-							_cover_transfer_detour.y = global_position.y
-							_cover_transfer_detouring = true
-							move_dir = side
-					else:
-						_cancel_cover_transfer()
-						move_dir = Vector3.ZERO
-	if is_wall_hugging:
-		var wall_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.0, global_position + Vector3.UP * 1.0 - _wall_hug_normal * 0.95)
-		wall_query.exclude = [get_rid()]
-		var wall_hit := get_world_3d().direct_space_state.intersect_ray(wall_query)
-		if wall_hit.is_empty():
-			var old_tangent := Vector3.UP.cross(_wall_hug_normal).normalized()
-			var side_input := signf(input_move.x)
-			if not is_zero_approx(side_input) and _try_wall_corner_transition(old_tangent * side_input):
-				wall_query = PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.0, global_position + Vector3.UP * 1.0 - _wall_hug_normal * 0.95)
-				wall_query.exclude = [get_rid()]
-				wall_hit = get_world_3d().direct_space_state.intersect_ray(wall_query)
-			if wall_hit.is_empty():
-				is_wall_hugging = false
-				_wall_hug_normal = Vector3.ZERO
-		else:
-			_wall_hug_normal = (wall_hit.normal as Vector3).normalized()
-			var tangent := Vector3.UP.cross(_wall_hug_normal).normalized()
-			move_dir = tangent * input_move.x + _wall_hug_normal * input_move.y
-			if move_dir.length_squared() > 1.0:
-				move_dir = move_dir.normalized()
-			var wall_distance: float = Vector2(global_position.x - wall_hit.position.x, global_position.z - wall_hit.position.z).length()
-			var correction := clampf(wall_distance - 0.58, -0.8, 0.8)
-			velocity += -_wall_hug_normal * correction * 5.0 * delta
-		if is_wall_hugging:
-			is_crouching = true
-			is_sprinting = false
-		else:
-			is_crouching = false
-	else:
-		is_sprinting = not is_crouching and (sprint_requested or input_move.length() >= 0.82)
-	var current_speed := move_speed * (0.48 if is_crouching else (1.42 if is_sprinting else 1.0))
-	var desired_velocity := move_dir * current_speed
-	var accel := movement_acceleration if move_dir.length_squared() > 0.001 else movement_braking
-	velocity.x = move_toward(velocity.x, desired_velocity.x, accel * delta)
-	velocity.z = move_toward(velocity.z, desired_velocity.z, accel * delta)
-	if is_instance_valid(_upper_body):
-		_upper_body.position.y = lerpf(_upper_body.position.y, -0.28 if is_crouching else 0.0, 1.0 - exp(-12.0 * delta))
-	if is_crouching:
-		velocity.x *= 0.92
-		velocity.z *= 0.92
-	if is_instance_valid(target) and not target.is_dead:
-		var to_target := target.global_position - global_position
-		to_target.y = 0.0
-		if to_target.length_squared() > 0.04:
-			_face_direction(to_target.normalized(), delta, combat_turn_speed)
-	elif move_dir.length_squared() > 0.001:
-		_face_direction(move_dir, delta)
+	LOCOMOTION_CONTROLLER.update_player(self, delta)
+
 
 func _get_player_move_direction() -> Vector3:
-	var forward := -global_transform.basis.z
-	var right := global_transform.basis.x
-	var move_dir := right * input_move.x + forward * -input_move.y
-	if move_dir.length_squared() > 1.0:
-		move_dir = move_dir.normalized()
-	return move_dir
+	return LOCOMOTION_CONTROLLER.get_player_move_direction(self)
 
 
 func _ai_update(delta: float) -> void:
@@ -1017,10 +908,8 @@ func receive_distraction(noise_position: Vector3) -> void:
 
 
 func _face_direction(dir: Vector3, delta: float, turn_speed: float = 12.0) -> void:
-	if dir.length_squared() < 0.001:
-		return
-	var target_angle := atan2(-dir.x, -dir.z)
-	rotation.y = lerp_angle(rotation.y, target_angle, 1.0 - exp(-turn_speed * delta))
+	LOCOMOTION_CONTROLLER.face_direction(self, dir, delta, turn_speed)
+
 
 func start_attack(kind: String = "slash") -> bool:
 	if is_dead or state != CombatState.FREE or is_blocking or not ATTACK_KINDS.has(kind):
@@ -1057,93 +946,20 @@ func _resolve_attack_hit() -> void:
 	attack_hit.emit(target)
 
 func receive_strike(damage: float, posture_damage: float, attacker: Node3D, incoming_kind: String = "slash") -> String:
-	if is_dead:
-		return "ignored"
-	if resurrection_invulnerability > 0.0:
-		return "immune"
-	if is_dodging:
-		combat_feedback.emit("evaded", self)
-		return "evaded"
-	if incoming_kind == "lightning" and is_player and lightning_reversal_timer > 0.0 and velocity.y > 0.35:
-		lightning_reversal_timer = 0.0
-		if is_instance_valid(attacker) and attacker.has_method("receive_lightning_reversal"):
-			attacker.receive_lightning_reversal(self)
-		combat_feedback.emit("lightning_reversed", self)
-		return "lightning_reversed"
-	if incoming_kind == "thrust" and is_mikiri_countering:
-		is_mikiri_countering = false
-		counter_timer = 0.0
-		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
-			attacker.receive_deflect(48.0)
-		combat_feedback.emit("mikiri", self)
-		return "mikiri"
-	if incoming_kind == "sweep" and is_sweep_evading:
-		is_sweep_evading = false
-		counter_timer = 0.0
-		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
-			attacker.receive_deflect(32.0)
-		combat_feedback.emit("sweep_evaded", self)
-		return "sweep_evaded"
-	if is_deflecting and incoming_kind != "grab":
-		_parry_pose_timer = 0.22
-		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
-			attacker.receive_deflect(40.0 if incoming_kind == "heavy" else 26.0)
-		combat_feedback.emit("deflect", self)
-		return "deflected"
-	if is_blocking and incoming_kind != "grab":
-		var block_scale := 0.85 if incoming_kind == "heavy" else (0.72 if incoming_kind == "thrust" else 0.55)
-		posture += posture_damage * block_scale
-		_check_posture_break()
-		combat_feedback.emit("guard", self)
-		return "blocked"
-	vitality = maxf(0.0, vitality - damage)
-	posture += posture_damage
-	_check_posture_break()
-	if vitality <= 0.0:
-		_die()
-	else:
-		_begin_hit_reaction(attacker, incoming_kind)
-		if incoming_kind == "grab":
-			hit_reaction_timer = 0.62
-			combat_feedback.emit("grabbed", self)
-		else:
-			combat_feedback.emit("hit", self)
-	return "grabbed" if incoming_kind == "grab" else "hit"
+	return COMBAT_RESOLUTION.receive_strike(self, damage, posture_damage, attacker, incoming_kind)
+
 
 func receive_deflect(amount: float) -> void:
-	if is_dead:
-		return
-	_deflect_recoil_timer = 0.20
-	posture += amount
-	_check_posture_break()
+	COMBAT_RESOLUTION.receive_deflect(self, amount)
+
 
 func _check_posture_break() -> void:
-	posture = clampf(posture, 0.0, max_posture)
-	if posture >= max_posture and state != CombatState.POSTURE_BROKEN:
-		state = CombatState.POSTURE_BROKEN
-		_posture_break_age = 0.0
-		attack_phase_changed.emit("interrupted")
-		posture_break_timer = POSTURE_BREAK_TIME
-		posture_stomped = false
-		hit_reaction_timer = 0.0
-		is_blocking = false
-		deflect_timer = 0.0
-		is_deflecting = false
-		posture_broken.emit()
-		combat_feedback.emit("posture_break", self)
+	COMBAT_RESOLUTION.check_posture_break(self)
+
 
 func _die() -> void:
-	if is_dead:
-		return
-	is_dead = true
-	if is_player:
-		resurrection_available = resurrection_charges > 0
-	state = CombatState.DEAD
-	attack_phase_changed.emit("finished")
-	is_blocking = false
-	velocity = Vector3.ZERO
-	combat_feedback.emit("death", self)
-	died.emit()
+	COMBAT_RESOLUTION.die(self)
+
 
 func set_swim_vertical_input(value: float) -> void:
 	TRAVERSAL_CONTROLLER.set_swim_vertical_input(self, value)
