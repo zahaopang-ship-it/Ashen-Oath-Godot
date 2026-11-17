@@ -4,6 +4,7 @@ const NAVIGATION_STEERING = preload("res://scripts/ai/sentinel_navigation_steeri
 const STEALTH_AWARENESS = preload("res://scripts/ai/stealth_awareness_controller.gd")
 const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
 const TRAVERSAL_CONTROLLER = preload("res://scripts/traversal/fighter_traversal_controller.gd")
+const PROSTHETIC_CONTROLLER = preload("res://scripts/prosthetics/fighter_prosthetic_controller.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -975,28 +976,27 @@ func emit_noise(noise_position: Vector3, radius: float) -> void:
 
 
 func use_prosthetic(tool: String) -> bool:
-	if not is_player or is_dead or state != CombatState.FREE or is_blocking or prosthetic_cooldown > 0.0:
-		return false
-	var base_costs := {"shuriken": 18.0, "firecracker": 28.0, "axe": 32.0, "umbrella": 24.0}
-	if not base_costs.has(tool):
-		return false
-	var level: int = int(prosthetic_upgrades[tool])
-	var cost := maxf(8.0, float(base_costs[tool]) * (1.0 - 0.08 * float(level)))
-	if prosthetic_energy < cost:
-		return false
-	var succeeded := false
-	match tool:
-		"shuriken":
-			succeeded = _use_shuriken()
-			if succeeded:
-				prosthetic_cooldown = 0.38
-		"firecracker":
-			_use_firecracker()
-			succeeded = true
-			prosthetic_cooldown = 0.75
-		"axe":
-			succeeded = _use_axe()
-			if succeeded:
-				prosthetic_cooldown = 0.72
+	return PROSTHETIC_CONTROLLER.use_prosthetic(self, tool)
+
+
+func _use_shuriken() -> bool:
+	return PROSTHETIC_CONTROLLER.use_shuriken(self)
+
+
+func _use_firecracker() -> void:
+	PROSTHETIC_CONTROLLER.use_firecracker(self)
+
+
+func _use_axe() -> bool:
+	return PROSTHETIC_CONTROLLER.use_axe(self)
+
+
+func begin_lightning_reversal() -> bool:
+	return PROSTHETIC_CONTROLLER.begin_lightning_reversal(self)
+
+
+func receive_lightning_reversal(defender: Node3D) -> void:
+	PROSTHETIC_CONTROLLER.receive_lightning_reversal(self, defender)
+
 
 [executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]
