@@ -194,6 +194,8 @@ func _run() -> void:
 	feedback_guard.begin_deflect()
 	feedback_guard.receive_strike(8.0, 5.0, feedback_source)
 	_check(feedback_log.has("deflect"), "perfect deflect emits combat feedback")
+	_check(feedback_guard._parry_pose_timer > 0.0, "perfect deflect triggers a timed blade-contact pose")
+	_check(feedback_source._deflect_recoil_timer > 0.0, "deflected attacker receives a timed weapon recoil")
 	_check(ResourceLoader.exists("res://audio/impact_body.wav"), "original body impact sound is included")
 	_check(ResourceLoader.exists("res://audio/sword_deflect.wav"), "original sword deflect sound is included")
 	_check(ResourceLoader.exists("res://audio/guard_clang.wav"), "original guard clang sound is included")
@@ -264,7 +266,7 @@ func _run() -> void:
 	sprinter.call("_player_update", 0.016)
 	_check(sprinter.is_sprinting and sprinter.velocity.length() > sprinter.move_speed * 0.6 * 1.2, "keyboard sprint request works below full joystick deflection")
 
-	print("Combat tests: ", 76 - failures.size(), "/76 passed")
+	print("Combat tests: ", 78 - failures.size(), "/78 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:

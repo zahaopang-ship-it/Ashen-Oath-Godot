@@ -228,3 +228,10 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added regression checks for elbow response during attack anticipation and defensive guard.
 - Headless validation: combat 76/76, boss 22/22, feedback integration 3/3, Godot editor import and main-scene smoke passed.
 - Limitation: the rig remains a hierarchy of primitive meshes and Node3D pivots; no skinned character, inverse kinematics, retargeted animation clips, or Android visual/device validation yet.
+
+## M3 — Deflect clash and weapon-recoil feedback
+- Perfect deflect now drives a short blade-contact pose on the defender and a separate shoulder/weapon recoil on the attacker.
+- Added a brief crossed-blade spark flash at the midpoint between the fighters, layered with the existing deflect hitstop, camera shake, and spatial sword sound.
+- Added combat assertions for both timed reactions and integration checks for the generated clash effect.
+- Headless validation: combat 78/78, boss 22/22, feedback integration 5/5, main-scene smoke passed, editor import passed, and `git diff --check` passed.
+- Limitation: clash FX is a procedural primitive flash, not a particle system or authored VFX; visual timing and placement still need in-engine and Android device review.

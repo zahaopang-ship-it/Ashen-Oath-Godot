@@ -36,6 +36,8 @@ var posture_break_timer := 0.0
 var hit_reaction_timer := 0.0
 var hit_reaction_duration := 0.18
 var hit_flash_timer := 0.0
+var _parry_pose_timer := 0.0
+var _deflect_recoil_timer := 0.0
 var _body_material: StandardMaterial3D
 var _upper_body: Node3D
 var _weapon_pivot: Node3D
@@ -106,6 +108,8 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 		return
 	deflect_timer = maxf(0.0, deflect_timer - delta)
+	_parry_pose_timer = maxf(0.0, _parry_pose_timer - delta)
+	_deflect_recoil_timer = maxf(0.0, _deflect_recoil_timer - delta)
 	deflect_cooldown = maxf(0.0, deflect_cooldown - delta)
 	dodge_timer = maxf(0.0, dodge_timer - delta)
 	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
@@ -360,6 +364,17 @@ func _update_combat_animation(delta: float) -> void:
 			body_pose.z += 0.025
 			left_arm_pose.z += 0.08
 			right_arm_pose.z -= 0.06
+	var parry_blend := clampf(_parry_pose_timer / 0.22, 0.0, 1.0)
+	var recoil_blend := clampf(_deflect_recoil_timer / 0.20, 0.0, 1.0)
+	# A successful deflect snaps the defender's blade into the contact line.
+	right_arm_pose += Vector3(-0.24, 0.0, 0.42) * parry_blend
+	left_arm_pose += Vector3(-0.10, 0.0, -0.16) * parry_blend
+	weapon_pose += Vector3(-0.32, 0.0, 0.58) * parry_blend
+	# The attacker absorbs a short, readable recoil through shoulders and wrists.
+	body_pose.x -= 0.16 * recoil_blend
+	right_arm_pose += Vector3(0.28, 0.0, -0.24) * recoil_blend
+	left_arm_pose += Vector3(0.12, 0.0, 0.12) * recoil_blend
+	weapon_pose += Vector3(0.38, 0.0, -0.30) * recoil_blend
 	_upper_body.rotation = _upper_body.rotation.lerp(body_pose, weight)
 	_upper_body.position = _upper_body.position.lerp(body_offset, weight)
 	_weapon_pivot.rotation = _weapon_pivot.rotation.lerp(weapon_pose, weight)
@@ -496,6 +511,7 @@ func receive_strike(damage: float, posture_damage: float, attacker: Node3D, inco
 		combat_feedback.emit("sweep_evaded", self)
 		return "sweep_evaded"
 	if is_deflecting and incoming_kind != "grab":
+		_parry_pose_timer = 0.22
 		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
 			attacker.receive_deflect(40.0 if incoming_kind == "heavy" else 26.0)
 		combat_feedback.emit("deflect", self)
@@ -523,6 +539,7 @@ func receive_strike(damage: float, posture_damage: float, attacker: Node3D, inco
 func receive_deflect(amount: float) -> void:
 	if is_dead:
 		return
+	_deflect_recoil_timer = 0.20
 	posture += amount
 	_check_posture_break()
 

@@ -388,6 +388,40 @@ func _on_combat_feedback(kind: String, source: Node3D) -> void:
 			shake = 0.72
 	_trigger_hitstop(hitstop, shake)
 	_play_combat_sound(kind, source.global_position)
+	if kind == "deflect":
+		_spawn_deflect_clash(source)
+
+func _spawn_deflect_clash(source: Node3D) -> void:
+	var clash := Node3D.new()
+	clash.name = "DeflectClashFX"
+	var contact := source.global_position + Vector3.UP * 1.30
+	if "target" in source and is_instance_valid(source.get("target")):
+		var opponent: Node3D = source.get("target")
+		contact = (source.global_position + opponent.global_position) * 0.5 + Vector3.UP * 1.35
+	add_child(clash)
+	clash.global_position = contact
+	clash.rotation.y = source.global_rotation.y
+	clash.scale = Vector3.ONE * 0.35
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(0.72, 0.94, 1.0, 1.0)
+	material.emission_enabled = true
+	material.emission = Color(0.28, 0.78, 1.0)
+	material.emission_energy_multiplier = 3.2
+	for angle in [-0.68, 0.68]:
+		var spark := MeshInstance3D.new()
+		var shape := BoxMesh.new()
+		shape.size = Vector3(0.055, 0.055, 0.72)
+		spark.mesh = shape
+		spark.rotation.y = angle
+		spark.material_override = material
+		clash.add_child(spark)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(clash, "scale", Vector3.ONE * 1.25, 0.16).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(material, "albedo_color:a", 0.0, 0.16)
+	tween.chain().tween_callback(clash.queue_free)
 
 func _play_combat_sound(kind: String, world_position: Vector3) -> void:
 	if not AUDIO_EVENTS.has(kind):

@@ -25,11 +25,15 @@ func _run() -> void:
 		if child is AudioStreamPlayer3D and child.name == "CombatSFX":
 			audio_nodes += 1
 	_check(audio_nodes == 1, "combat feedback spawns a spatial impact sound")
+	main._on_combat_feedback("deflect", main.player)
+	var clash_fx := main.get_node_or_null("DeflectClashFX")
+	_check(is_instance_valid(clash_fx), "perfect deflect spawns a crossed-blade contact flash")
+	_check(clash_fx.get_child_count() == 2, "deflect contact flash contains two crossing spark blades")
 	await create_timer(0.18, true, false, true).timeout
 	main._restore_hitstop(main._hitstop_generation) # Drive the restore callback explicitly in the SceneTree test harness.
 	_check(is_equal_approx(Engine.time_scale, 1.0), "hitstop restores the previous time scale (actual: %.3f)" % Engine.time_scale)
 	await create_timer(0.65, true, false, true).timeout
 	main.queue_free()
 	await process_frame
-	print("Feedback integration tests: ", 3 - failures.size(), "/3 passed")
+	print("Feedback integration tests: ", 5 - failures.size(), "/5 passed")
 	quit(1 if not failures.is_empty() else 0)
