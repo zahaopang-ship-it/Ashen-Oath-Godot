@@ -91,9 +91,11 @@ func _build_ui() -> void:
 	_register_action("LEDGE", Vector2(-95, -410), "ledge", Color(0.38, 0.42, 0.28))
 	_register_action("SWIM UP", Vector2(-475, -410), "swim_up", Color(0.12, 0.42, 0.62))
 	_register_action("SWIM DOWN", Vector2(-585, -410), "swim_down", Color(0.12, 0.34, 0.52))
+	_register_action("REST", Vector2(-370, -410), "rest", Color(0.62, 0.40, 0.16))
+	_register_action("SECRET", Vector2(-275, -410), "secret", Color(0.18, 0.52, 0.44))
 	var hint := Label.new()
 	hint.text = "C CROUCH  /  V VAULT  /  M CLIMB  /  H WALL-HUG  /  B COVER-TO-COVER"
-	hint.text = "G GRAPPLE  /  N CLIMB WALL  /  , DROP  /  . LEDGE GRAB  /  SWIM UP + DOWN"
+	hint.text = "Z / REST  X / SECRET  G / GRAPPLE  N / CLIMB  LEDGE + SWIM"
 	hint.position = Vector2(28, 154)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -207,6 +209,8 @@ func _action_down(action: String) -> void:
 		"ledge": game.player.try_ledge_grab()
 		"swim_up": game.player.set_swim_vertical_input(1.0)
 		"swim_down": game.player.set_swim_vertical_input(-1.0)
+		"rest": game.player.interact_rest_point()
+		"secret": game.player.interact_secret_cache()
 
 func _action_up(action: String) -> void:
 	match action:
@@ -238,7 +242,9 @@ func _process(_delta: float) -> void:
 	prosthetic_bar.value = game.player.prosthetic_energy
 	var stealth_label := " / COVERED" if game.player.is_in_cover and game.player.is_crouching else (" / IN COVER" if game.player.is_in_cover else "")
 	var revive_text := "  REVIVE: " + str(game.player.resurrection_charges) if game.player.is_dead else ""
-	status_label.text = "SPIRIT: " + str(roundi(game.player.prosthetic_energy)) + "  UPGRADES: " + str(game.player.prosthetic_upgrade_points) + "  |  PLAYER: " + _state_name(game.player) + revive_text + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + stealth_label + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
+	var rest_prompt := "  / REST SHRINE [Z]" if is_instance_valid(game.player.get_nearest_rest_point()) else ""
+	var secret_prompt := "  / SECRET [X]" if is_instance_valid(game.player.get_nearest_secret_cache()) else ""
+	status_label.text = "SPIRIT: " + str(roundi(game.player.prosthetic_energy)) + "  UPGRADES: " + str(game.player.prosthetic_upgrade_points) + "  |  PLAYER: " + _state_name(game.player) + revive_text + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + stealth_label + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt + rest_prompt + secret_prompt
 
 func _state_name(fighter: Node) -> String:
 	if fighter.state == 4: return "POSTURE BROKEN"

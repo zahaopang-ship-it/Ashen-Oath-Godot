@@ -2,12 +2,14 @@ extends Node3D
 const FIGHTER_SCRIPT = preload("res://scripts/fighter.gd")
 const BOSS_SCRIPT = preload("res://scripts/boss.gd")
 const HUD_SCRIPT = preload("res://scripts/touch_hud.gd")
+const REST_POINT_SCRIPT = preload("res://scripts/rest_point.gd")
 var player: CharacterBody3D
 var enemy: CharacterBody3D
 var boss: CharacterBody3D
 var guard: CharacterBody3D
+var guard_east: CharacterBody3D
+var guard_north: CharacterBody3D
 var camera: Camera3D
-var arena_radius := 13.0
 var camera_yaw := 0.0
 var camera_pitch := -0.22
 var camera_impulse := 0.0
@@ -44,6 +46,17 @@ func _ready() -> void:
 	guard.patrol_speed = 1.55
 	guard.vision_range = 12.0
 	guard.vision_half_angle_degrees = 52.0
+	guard_east = _make_fighter("AshenLookout", Vector3(15.0, 0.0, 8.0), false)
+	guard_east.add_to_group("stealth_guards")
+	guard_east.target = player
+	guard_east.patrol_points.assign([Vector3(15.0, 0.0, 8.0), Vector3(19.0, 0.0, 8.0), Vector3(19.0, 0.0, 13.0), Vector3(14.0, 0.0, 13.0)])
+	guard_east.patrol_speed = 1.7
+	guard_east.vision_range = 13.0
+	guard_north = _make_fighter("AshenRanger", Vector3(-15.0, 0.0, -13.0), false)
+	guard_north.add_to_group("stealth_guards")
+	guard_north.target = player
+	guard_north.patrol_points.assign([Vector3(-15.0, 0.0, -13.0), Vector3(-19.0, 0.0, -13.0), Vector3(-19.0, 0.0, -18.0), Vector3(-13.0, 0.0, -18.0)])
+	guard_north.patrol_speed = 1.45
 	_create_stealth_cover(Vector3(-5.1, 0.0, -3.0), "MossyBushA")
 	_create_stealth_cover(Vector3(-9.2, 0.0, -4.5), "MossyBushB")
 	_create_stealth_cover(Vector3(-5.8, 0.0, -8.6), "SupplyCrates")
@@ -52,10 +65,22 @@ func _ready() -> void:
 	_create_grapple_point(Vector3(7.0, 4.8, 1.5), "GrappleAnchorEast")
 	_create_water_zone(Vector3(9.0, -0.15, -7.0), Vector3(5.0, 1.4, 7.0), "TrainingPond")
 	_create_climb_wall(Vector3(11.8, 2.0, 2.0), Vector3(0.55, 4.0, 7.0), "ClimbableTowerWall")
+	_create_exploration_paths()
+	_create_north_ruined_gate()
+	_create_east_watch_camp()
+	_create_landmark("WestGroveMonolith", Vector3(-19.0, 0.0, -7.0), Color(0.28, 0.36, 0.31))
+	_create_landmark("PondsideBell", Vector3(14.0, 0.0, -8.0), Color(0.25, 0.38, 0.46))
+	_create_secret_cache(Vector3(-21.0, 0.0, -8.5), "GroveRelicCache")
+	_create_rest_point(Vector3(0.0, 0.0, 8.5), "AshenRestShrine")
+	_create_rest_point(Vector3(-16.5, 0.0, -18.0), "GroveRestShrine")
 	enemy = boss
 	player.target = enemy
 	player_entered_water_connect()
 	player.set_checkpoint(Vector3(0.0, 0.0, 4.0))
+	var starting_shrine := get_node_or_null("AshenRestShrine")
+	if is_instance_valid(starting_shrine):
+		starting_shrine.set_active(true)
+	player.checkpoint_position = Vector3(0.0, 0.0, 10.0)
 	enemy.target = player
 	boss.boss_phase_changed.connect(_on_boss_phase_changed)
 	enemy.attack_phase_changed.connect(_on_enemy_attack_phase)
@@ -91,19 +116,165 @@ func _setup_world() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	world_env.environment = env
 	add_child(world_env)
-	_make_box("Arena", Vector3(0, -0.35, 0), Vector3(30, 0.7, 30), Color(0.22, 0.19, 0.15), true)
-	for i in range(32):
-		var angle := TAU * float(i) / 32.0
-		var p := Vector3(cos(angle) * arena_radius, 0.4, sin(angle) * arena_radius)
-		_make_box("PerimeterStone", p, Vector3(0.7, 0.8, 0.7), Color(0.28, 0.29, 0.28), true)
-	for i in range(8):
-		var x := -11.0 + float(i) * 3.1
+	_make_box("AshenValeGround", Vector3(0, -0.35, 0), Vector3(56, 0.7, 50), Color(0.22, 0.19, 0.15), true)
+	for x in range(-26, 27, 2):
+		_make_box("ValeBoundaryStone", Vector3(float(x), 1.8, -23.5), Vector3(2.1, 3.6, 1.1), Color(0.28, 0.29, 0.28), true)
+		_make_box("ValeBoundaryStone", Vector3(float(x), 1.8, 23.5), Vector3(2.1, 3.6, 1.1), Color(0.28, 0.29, 0.28), true)
+	for z in range(-22, 23, 2):
+		_make_box("ValeBoundaryStone", Vector3(-27.5, 1.8, float(z)), Vector3(1.1, 3.6, 2.1), Color(0.28, 0.29, 0.28), true)
+		_make_box("ValeBoundaryStone", Vector3(27.5, 1.8, float(z)), Vector3(1.1, 3.6, 2.1), Color(0.28, 0.29, 0.28), true)
+	for x in [-11.0, -8.0, -5.0, 5.0, 8.0, 11.0]:
 		_make_box("FencePost", Vector3(x, 1.0, -12.8), Vector3(0.35, 2.0, 0.35), Color(0.20, 0.12, 0.09), true)
-	_make_box("FenceRail", Vector3(0, 1.35, -12.8), Vector3(25, 0.22, 0.22), Color(0.25, 0.13, 0.09), true)
-	_make_box("FenceRailLow", Vector3(0, 0.65, -12.8), Vector3(25, 0.16, 0.16), Color(0.25, 0.13, 0.09), true)
-	for x in [-10.0, 10.0]:
-		for z in [-9.0, 9.0]:
+	_make_box("FenceRailWest", Vector3(-8.0, 1.35, -12.8), Vector3(8.0, 0.22, 0.22), Color(0.25, 0.13, 0.09), true)
+	_make_box("FenceRailEast", Vector3(8.0, 1.35, -12.8), Vector3(8.0, 0.22, 0.22), Color(0.25, 0.13, 0.09), true)
+	_make_box("FenceRailWestLow", Vector3(-8.0, 0.65, -12.8), Vector3(8.0, 0.16, 0.16), Color(0.25, 0.13, 0.09), true)
+	_make_box("FenceRailEastLow", Vector3(8.0, 0.65, -12.8), Vector3(8.0, 0.16, 0.16), Color(0.25, 0.13, 0.09), true)
+	for x in [-22.0, -10.0, 10.0, 22.0]:
+		for z in [-19.0, 0.0, 18.0]:
 			_make_tree(Vector3(x, 0, z))
+
+func _create_exploration_paths() -> void:
+	for z in range(7, -18, -2):
+		_create_path_stone(Vector3(0.0, 0.055, float(z)))
+	for x in range(2, 17, 2):
+		_create_path_stone(Vector3(float(x), 0.055, -7.0))
+	for x in range(-2, -17, -2):
+		_create_path_stone(Vector3(float(x), 0.055, -5.0))
+	for z in range(-7, -19, -2):
+		_create_path_stone(Vector3(-14.0, 0.055, float(z)))
+	for x in range(0, 17, 2):
+		_create_path_stone(Vector3(float(x), 0.055, 14.0))
+	for x in [-23.0, -20.0, 20.0, 23.0]:
+		for z in [-16.0, -12.0, 12.0, 16.0]:
+			_create_landmark("WayfindingStone", Vector3(x, 0.0, z), Color(0.30, 0.34, 0.31))
+
+func _create_path_stone(pos: Vector3) -> void:
+	var stone := Node3D.new()
+	stone.name = "ValeTrailStone"
+	stone.position = pos
+	stone.add_to_group("exploration_paths")
+	add_child(stone)
+	var mesh := MeshInstance3D.new()
+	var shape := BoxMesh.new()
+	shape.size = Vector3(1.55, 0.11, 1.2)
+	mesh.mesh = shape
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.34, 0.32, 0.27)
+	material.roughness = 1.0
+	mesh.material_override = material
+	stone.add_child(mesh)
+
+func _create_north_ruined_gate() -> void:
+	var gate := Node3D.new()
+	gate.name = "NorthRuinedGate"
+	gate.position = Vector3(0.0, 0.0, -18.5)
+	gate.add_to_group("exploration_landmarks")
+	add_child(gate)
+	for x in [-3.2, 3.2]:
+		var pillar := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(1.0, 5.0, 1.0)
+		pillar.mesh = mesh
+		pillar.position = Vector3(x, 2.5, 0.0)
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color(0.25, 0.27, 0.28)
+		material.roughness = 0.95
+		pillar.material_override = material
+		gate.add_child(pillar)
+	var lintel := MeshInstance3D.new()
+	var lintel_mesh := BoxMesh.new()
+	lintel_mesh.size = Vector3(7.0, 0.8, 1.3)
+	lintel.mesh = lintel_mesh
+	lintel.position.y = 5.0
+	var lintel_material := StandardMaterial3D.new()
+	lintel_material.albedo_color = Color(0.20, 0.22, 0.23)
+	lintel.material_override = lintel_material
+	gate.add_child(lintel)
+
+func _create_east_watch_camp() -> void:
+	var camp := Node3D.new()
+	camp.name = "EastWatchCamp"
+	camp.position = Vector3(18.0, 0.0, 10.5)
+	camp.add_to_group("exploration_landmarks")
+	add_child(camp)
+	for x in [-2.0, 2.0]:
+		_make_box("CampPost", camp.position + Vector3(x, 1.0, 0.0), Vector3(0.25, 2.0, 0.25), Color(0.22, 0.13, 0.08), false)
+	var canopy := MeshInstance3D.new()
+	var canopy_mesh := BoxMesh.new()
+	canopy_mesh.size = Vector3(4.8, 0.18, 3.4)
+	canopy.mesh = canopy_mesh
+	canopy.position = Vector3(0.0, 2.0, 0.0)
+	var canopy_material := StandardMaterial3D.new()
+	canopy_material.albedo_color = Color(0.22, 0.16, 0.11)
+	canopy.material_override = canopy_material
+	camp.add_child(canopy)
+
+func _create_landmark(label: String, pos: Vector3, color: Color) -> Node3D:
+	var root := Node3D.new()
+	root.name = label
+	root.position = pos
+	root.add_to_group("exploration_landmarks")
+	add_child(root)
+	var mesh := MeshInstance3D.new()
+	var pillar := BoxMesh.new()
+	pillar.size = Vector3(0.55, 2.2, 0.55)
+	mesh.mesh = pillar
+	mesh.position.y = 1.1
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 0.9
+	mesh.material_override = material
+	root.add_child(mesh)
+	return root
+
+func _create_rest_point(pos: Vector3, label: String) -> void:
+	var shrine := Node3D.new()
+	shrine.set_script(REST_POINT_SCRIPT)
+	shrine.position = pos
+	add_child(shrine)
+	shrine.configure(label)
+
+func _create_secret_cache(pos: Vector3, label: String) -> void:
+	var cache := Node3D.new()
+	cache.name = label
+	cache.position = pos
+	cache.add_to_group("secret_caches")
+	cache.set_meta("collected", false)
+	add_child(cache)
+	var base := MeshInstance3D.new()
+	var base_mesh := BoxMesh.new()
+	base_mesh.size = Vector3(1.0, 0.58, 0.72)
+	base.mesh = base_mesh
+	base.position.y = 0.38
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.20, 0.12, 0.075)
+	wood.roughness = 0.9
+	base.material_override = wood
+	cache.add_child(base)
+	var lid := MeshInstance3D.new()
+	var lid_mesh := BoxMesh.new()
+	lid_mesh.size = Vector3(1.04, 0.18, 0.76)
+	lid.mesh = lid_mesh
+	lid.position = Vector3(0.0, 0.76, 0.0)
+	var metal := StandardMaterial3D.new()
+	metal.albedo_color = Color(0.42, 0.34, 0.18)
+	metal.metallic = 0.65
+	lid.material_override = metal
+	cache.add_child(lid)
+	var relic := MeshInstance3D.new()
+	var orb := SphereMesh.new()
+	orb.radius = 0.16
+	orb.height = 0.32
+	relic.mesh = orb
+	relic.position.y = 1.12
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(0.18, 0.85, 0.72)
+	glow.emission_enabled = true
+	glow.emission = Color(0.05, 0.9, 0.68)
+	glow.emission_energy_multiplier = 2.8
+	relic.material_override = glow
+	cache.add_child(relic)
 
 func _make_fighter(label: String, pos: Vector3, player_controlled: bool, boss_character: bool = false) -> CharacterBody3D:
 	var body := CharacterBody3D.new()
@@ -464,8 +635,9 @@ func _play_combat_sound(kind: String, world_position: Vector3) -> void:
 func _process(delta: float) -> void:
 	if not is_instance_valid(player) or not is_instance_valid(enemy):
 		return
-	var focus := player.global_position.lerp(enemy.global_position, 0.28)
-	var combat_distance := player.global_position.distance_to(enemy.global_position)
+	var boss_distance := player.global_position.distance_to(enemy.global_position)
+	var focus := player.global_position.lerp(enemy.global_position, 0.28) if boss_distance < 17.0 and not enemy.is_dead else player.global_position
+	var combat_distance := boss_distance if boss_distance < 17.0 and not enemy.is_dead else 5.0
 	var camera_distance := clampf(5.8 + combat_distance * 0.34, 6.8, 9.6)
 	if player.is_sprinting:
 		camera_distance += 0.35
@@ -513,6 +685,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_G: player.try_grapple()
 			KEY_T: player.aerial_grapple_attack()
 			KEY_Y: player.resurrect()
+			KEY_Z: player.interact_rest_point()
+			KEY_X: player.interact_secret_cache()
 			KEY_N: player.try_vertical_climb()
 			KEY_COMMA: player.stop_vertical_climb()
 			KEY_PERIOD: player.try_ledge_grab()

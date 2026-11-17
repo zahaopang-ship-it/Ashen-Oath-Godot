@@ -11,14 +11,18 @@ Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-i
 - Phase II lightning attack with a long blue telegraph, airborne timed lightning reversal, reflected boss stagger, and emissive lightning arc feedback. Three prototype upgrade tokens let the player cycle through shuriken, firecracker, axe, and umbrella upgrades (keyboard U / touchscreen UPGRADE).
 - One-use player resurrection restores 55% vitality at the configured checkpoint, clears posture, and grants 1.35 seconds of damage immunity. Three glowing grapple anchors support forward-cone targeting, collision-aware arcing movement, and a contextual heavy aerial follow-up (keyboard G/T/Y; touchscreen GRAPPLE/AIR ATTACK/REVIVE).
 - Expanded traversal: a shallow training pond switches to swimming movement with vertical swim input; marked climbable walls support vertical climbing; airborne players can catch a ledge and mantle onto its top. Touchscreen adds CLIMB WALL (toggle), LEDGE, SWIM UP and SWIM DOWN.
+- Expanded the test arena into the bounded Ashen Vale exploration region with a traversable north gate, connected stone trail markers, a western grove, eastern watch camp, pondside landmark, and three independently patrolling Sentinels.
+- Added two interactable rest shrines. Press Z or the touchscreen REST action nearby to set the active checkpoint, restore vitality/posture/spirit energy, and refill the single resurrection charge. The active shrine is marked by a warm ember and the HUD displays a contextual prompt.
+- A hidden Grove Relic Cache rewards off-path exploration. Press X or the touchscreen SECRET action nearby to collect a one-time prosthetic upgrade point and spirit energy.
 - Procedural wall-hug pose leans the torso toward the wall and tucks the weapon arm while preserving the crouched stance.
 - Current validation is headless on Linux; Android export and real-device touch/visual checks are still pending.
 
 ## Roadmap
-1. Stabilize combat prototype and multi-touch input.
-2. Add animation state machine, hit reactions, posture break, Mikiri, sweep, and hitstop.
-3. Add deathblow, boss phases, resurrection, prosthetic tools, grappling, and stealth.
-4. Add real licensed/CC0 character, environment, and audio assets; optimize and validate Android export.
+1. Replace primitive fighters with rigged characters and authored combat/traversal animation.
+2. Replace blockout landmarks and props with a coherent licensed/CC0 environment art set.
+3. Add robust navigation/pathfinding and more encounter-specific enemy behaviors.
+4. Add quest progression, additional secrets, and persistent save/checkpoint data.
+5. Optimize rendering, input, memory, and validate a real Android export on device.
 
 ## Validation policy
 A milestone is not complete until the project opens in the pinned Godot version, scripts parse without errors, scene starts, and each touch action is tested. Android export requires matching export templates and an actual build test.
