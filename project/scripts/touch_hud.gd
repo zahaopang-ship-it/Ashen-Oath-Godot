@@ -14,6 +14,7 @@ var enemy_posture: ProgressBar
 var suspicion_bar: ProgressBar
 var prosthetic_bar: ProgressBar
 var status_label: Label
+var objective_label: Label
 var action_rects: Dictionary = {}
 
 func _ready() -> void:
@@ -48,6 +49,13 @@ func _build_ui() -> void:
 	status_label.add_theme_font_size_override("font_size", 14)
 	status_label.add_theme_color_override("font_color", Color(0.95, 0.82, 0.48))
 	root.add_child(status_label)
+	objective_label = Label.new()
+	objective_label.position = Vector2(500, 78)
+	objective_label.size = Vector2(650, 48)
+	objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_label.add_theme_font_size_override("font_size", 13)
+	objective_label.add_theme_color_override("font_color", Color(0.72, 0.86, 0.72))
+	root.add_child(objective_label)
 	stick_control = Control.new()
 	stick_control.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	stick_control.position = Vector2(70, -220)
@@ -244,6 +252,8 @@ func _process(_delta: float) -> void:
 	var revive_text := "  REVIVE: " + str(game.player.resurrection_charges) if game.player.is_dead else ""
 	var rest_prompt := "  / REST SHRINE [Z]" if is_instance_valid(game.player.get_nearest_rest_point()) else ""
 	var secret_prompt := "  / SECRET [X]" if is_instance_valid(game.player.get_nearest_secret_cache()) else ""
+	if is_instance_valid(game.exploration_objectives):
+		objective_label.text = game.exploration_objectives.get_status_text()
 	status_label.text = "SPIRIT: " + str(roundi(game.player.prosthetic_energy)) + "  UPGRADES: " + str(game.player.prosthetic_upgrade_points) + "  |  PLAYER: " + _state_name(game.player) + revive_text + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + stealth_label + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt + rest_prompt + secret_prompt
 
 func _state_name(fighter: Node) -> String:

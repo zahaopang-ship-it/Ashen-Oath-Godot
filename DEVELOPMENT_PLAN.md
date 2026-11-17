@@ -386,3 +386,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added an exploration-world regression suite covering patrol population, landmark/path layout, touch REST/SECRET actions, secret-cache range and one-time rewards, shrine range checks, checkpoint transfer, resource restoration, active shrine visuals, and resurrection at the newly selected checkpoint.
 - Headless validation: all 284 assertions across ten suites pass; editor import, main-scene smoke, and `git diff --check` pass.
 - Limitations: this is a handcrafted compact prototype region, not a streamed open world. Trail stones and landmarks are primitive meshes; there is no navigation mesh/pathfinding, minimap, quest system, additional collectibles beyond the single prototype cache, save persistence, authored environment art, or Android device validation yet.
+
+## M19 — Linked exploration oath and reward progression
+- Added a small event-driven exploration objective controller. The Grove's Forgotten Oath begins by asking the player to find the western Grove Relic Cache; collecting it advances the objective to the remote Grove Rest Shrine.
+- Activating the Grove Rest Shrine after discovering the relic completes the two-step objective and grants two additional prosthetic upgrade points plus up to 35 spirit energy. The reward is one-time and cannot be farmed by resting repeatedly.
+- Player exploration interactions now emit lightweight events, keeping objective progression separate from combat and shrine implementation. The objective text is displayed in a dedicated HUD line and updates as the player advances.
+- Added an exploration-objectives regression suite covering initial state, both objective transitions, reward amounts, duplicate-reward prevention, and HUD integration (11 assertions).
+- Headless validation: all 295 assertions across eleven suites pass; Godot 4.7.2 editor import and main-scene smoke pass; `git diff --check` passes.
+- Limitations: objective progress and rewards are session-only; there is no save/load persistence, journal UI, branching quest logic, map marker, or Android touch/rendering validation. Guard navigation remains waypoint-based and does not yet have global pathfinding.

@@ -4,6 +4,7 @@ signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
 signal posture_broken
 signal died
+signal exploration_event(event_name: String)
 signal combat_feedback(kind: String, source: Node3D)
 
 enum CombatState { FREE, WINDUP, ACTIVE, RECOVERY, POSTURE_BROKEN, DEAD, HITSTUN, EXECUTING }
@@ -1612,6 +1613,7 @@ func interact_rest_point(max_distance: float = 2.8) -> bool:
 		if candidate.has_method("set_active"):
 			candidate.set_active(candidate == shrine)
 	checkpoint_position = shrine.global_position + Vector3(0.0, 0.0, 1.5)
+	exploration_event.emit("rest:" + shrine.name)
 	global_position = checkpoint_position
 	velocity = Vector3.ZERO
 	vitality = max_vitality
@@ -1637,6 +1639,7 @@ func interact_secret_cache(max_distance: float = 2.5) -> bool:
 	if not is_instance_valid(nearest):
 		return false
 	nearest.set_meta("collected", true)
+	exploration_event.emit("cache_collected")
 	nearest.visible = false
 	prosthetic_upgrade_points += 1
 	prosthetic_energy = minf(max_prosthetic_energy, prosthetic_energy + 25.0)

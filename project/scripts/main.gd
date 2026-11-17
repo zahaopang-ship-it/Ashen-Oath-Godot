@@ -3,6 +3,7 @@ const FIGHTER_SCRIPT = preload("res://scripts/fighter.gd")
 const BOSS_SCRIPT = preload("res://scripts/boss.gd")
 const HUD_SCRIPT = preload("res://scripts/touch_hud.gd")
 const REST_POINT_SCRIPT = preload("res://scripts/rest_point.gd")
+const OBJECTIVES_SCRIPT = preload("res://scripts/exploration_objectives.gd")
 var player: CharacterBody3D
 var enemy: CharacterBody3D
 var boss: CharacterBody3D
@@ -10,6 +11,7 @@ var guard: CharacterBody3D
 var guard_east: CharacterBody3D
 var guard_north: CharacterBody3D
 var camera: Camera3D
+var exploration_objectives: Node
 var camera_yaw := 0.0
 var camera_pitch := -0.22
 var camera_impulse := 0.0
@@ -81,6 +83,11 @@ func _ready() -> void:
 	if is_instance_valid(starting_shrine):
 		starting_shrine.set_active(true)
 	player.checkpoint_position = Vector3(0.0, 0.0, 10.0)
+	exploration_objectives = Node.new()
+	exploration_objectives.name = "ExplorationObjectives"
+	exploration_objectives.set_script(OBJECTIVES_SCRIPT)
+	add_child(exploration_objectives)
+	exploration_objectives.configure(player)
 	enemy.target = player
 	boss.boss_phase_changed.connect(_on_boss_phase_changed)
 	enemy.attack_phase_changed.connect(_on_enemy_attack_phase)
