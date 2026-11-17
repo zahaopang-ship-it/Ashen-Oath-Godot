@@ -72,7 +72,7 @@ func _build_ui() -> void:
 	_register_action("DEATHBLOW", Vector2(-370, -70), "deathblow", Color(0.72, 0.08, 0.08))
 	_register_action("CROUCH", Vector2(-370, -250), "crouch", Color(0.25, 0.34, 0.39))
 	var hint := Label.new()
-	hint.text = "C crouch  /  Move quietly  /  Approach guards from behind for stealth deathblow"
+	hint.text = "C CROUCH  /  Hide in bushes and crates  /  Stay low to avoid detection"
 	hint.position = Vector2(28, 132)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -194,7 +194,8 @@ func _process(_delta: float) -> void:
 	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
 	var awareness_text: String = ["UNAWARE", "SUSPICIOUS", "SEARCHING", "ALERTED"][game.guard.awareness_state]
 	suspicion_bar.value = game.guard.suspicion
-	status_label.text = "PLAYER: " + _state_name(game.player) + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
+	var stealth_label := " / COVERED" if game.player.is_in_cover and game.player.is_crouching else (" / IN COVER" if game.player.is_in_cover else "")
+	status_label.text = "PLAYER: " + _state_name(game.player) + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + stealth_label + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
 
 func _state_name(fighter: Node) -> String:
 	if fighter.state == 4: return "POSTURE BROKEN"

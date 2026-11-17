@@ -44,6 +44,9 @@ func _ready() -> void:
 	guard.patrol_speed = 1.55
 	guard.vision_range = 12.0
 	guard.vision_half_angle_degrees = 52.0
+	_create_stealth_cover(Vector3(-5.1, 0.0, -3.0), "MossyBushA")
+	_create_stealth_cover(Vector3(-9.2, 0.0, -4.5), "MossyBushB")
+	_create_stealth_cover(Vector3(-5.8, 0.0, -8.6), "SupplyCrates")
 	enemy = boss
 	player.target = enemy
 	enemy.target = player
@@ -504,6 +507,55 @@ func _unhandled_input(event: InputEvent) -> void:
 func rotate_camera(delta_x: float, delta_y: float) -> void:
 	camera_yaw -= delta_x * 0.004
 	camera_pitch = clampf(camera_pitch - delta_y * 0.003, -0.65, 0.15)
+
+func _create_stealth_cover(pos: Vector3, label: String) -> void:
+	var cover := StaticBody3D.new()
+	cover.name = label
+	cover.position = pos
+	cover.add_to_group("stealth_cover")
+	add_child(cover)
+	var foliage := MeshInstance3D.new()
+	var shape := SphereMesh.new()
+	shape.radius = 1.05 if label.begins_with("Mossy") else 0.78
+	shape.height = 1.65 if label.begins_with("Mossy") else 1.25
+	foliage.mesh = shape
+	foliage.position.y = 0.92 if label.begins_with("Mossy") else 0.68
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.105, 0.22, 0.13) if label.begins_with("Mossy") else Color(0.30, 0.20, 0.12)
+	material.roughness = 1.0
+	foliage.material_override = material
+	cover.add_child(foliage)
+	var collision := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.9, 1.65, 1.65) if label.begins_with("Mossy") else Vector3(1.55, 1.25, 1.45)
+	collision.shape = box
+	collision.position.y = box.size.y * 0.5
+	cover.add_child(collision)
+	var zone := Area3D.new()
+	zone.name = label + "ConcealmentZone"
+	zone.position = pos + Vector3(1.65, 0.0, 0.0)
+	zone.add_to_group("stealth_cover_zones")
+	zone.collision_layer = 0
+	zone.collision_mask = 1
+	zone.monitoring = true
+	zone.monitorable = false
+	add_child(zone)
+	var zone_shape := CollisionShape3D.new()
+	var zone_box := BoxShape3D.new()
+	zone_box.size = Vector3(2.8, 2.4, 2.8)
+	zone_shape.shape = zone_box
+	zone_shape.position.y = 1.1
+	zone.add_child(zone_shape)
+	zone.body_entered.connect(_on_stealth_cover_entered.bind(zone))
+	zone.body_exited.connect(_on_stealth_cover_exited.bind(zone))
+
+func _on_stealth_cover_entered(body: Node3D, zone: Area3D) -> void:
+	if body.has_method("set_stealth_cover"):
+		body.set_stealth_cover(zone, true)
+
+func _on_stealth_cover_exited(body: Node3D, zone: Area3D) -> void:
+	if body.has_method("set_stealth_cover"):
+		body.set_stealth_cover(zone, false)
 
 func _make_box(label: String, pos: Vector3, size: Vector3, color: Color, collision: bool) -> void:
 	var root: Node3D = StaticBody3D.new() if collision else Node3D.new()

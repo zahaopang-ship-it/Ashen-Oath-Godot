@@ -70,6 +70,8 @@ var vision_half_angle_degrees := 48.0
 var sprint_noise_range := 8.0
 var stealth_deathblow_started := false
 var is_crouching := false
+var is_in_cover := false
+var stealth_cover_count := 0
 var body_collision: CollisionShape3D
 var patrol_points: Array[Vector3] = []
 var patrol_index := 0
@@ -414,12 +416,18 @@ func _update_combat_animation(delta: float) -> void:
 			left_arm_pose.z += 0.08
 			right_arm_pose.z -= 0.06
 	if is_crouching:
-		left_leg_pose = maxf(left_leg_pose, 0.62)
-		right_leg_pose = maxf(right_leg_pose, 0.62)
-		body_pose.x += 0.12
-		body_offset.y -= 0.16
-		left_arm_pose.x -= 0.08
-		right_arm_pose.x -= 0.08
+		var sneak_cycle := sin(_combat_anim_time * (3.4 if planar_speed > 0.18 else 1.5))
+		var sneak_blend := clampf(planar_speed / maxf(0.1, move_speed * 0.48), 0.0, 1.0)
+		left_leg_pose = 0.48 + sneak_cycle * 0.10 * sneak_blend
+		right_leg_pose = 0.48 - sneak_cycle * 0.10 * sneak_blend
+		body_pose.x += 0.20 + sneak_cycle * 0.025 * sneak_blend
+		body_pose.z += 0.035 * sneak_cycle * sneak_blend
+		body_offset.y -= 0.22
+		left_arm_pose.x -= 0.16
+		right_arm_pose.x -= 0.18
+		left_arm_pose.z += 0.08
+		right_arm_pose.z -= 0.08
+		weapon_pose.x += 0.12
 	var parry_blend := clampf(_parry_pose_timer / 0.22, 0.0, 1.0)
 	var recoil_blend := clampf(_deflect_recoil_timer / 0.20, 0.0, 1.0)
 	# A successful deflect snaps the defender's blade into the contact line.
@@ -597,16 +605,21 @@ func _update_awareness(delta: float) -> void:
 	offset.y = 0.0
 	var distance := offset.length()
 	var crouched: bool = bool(target.get("is_crouching"))
-	var effective_vision := vision_range * (0.52 if crouched else 1.0)
+	var in_cover: bool = bool(target.get("is_in_cover"))
+	var effective_vision := vision_range * _get_target_vision_multiplier(target)
 	var visible := distance <= effective_vision and _target_in_vision_cone(offset) and _has_clear_line_of_sight(target)
-	var noisy: bool = (bool(target.get("is_sprinting")) or (bool(target.get("is_crouching")) == false and Vector2(target.velocity.x, target.velocity.z).length() > 3.2)) and distance <= sprint_noise_range
+	var noise_multiplier := 0.42 if crouched else 1.0
+	var noisy: bool = (bool(target.get("is_sprinting")) or (not crouched and Vector2(target.velocity.x, target.velocity.z).length() > 3.2)) and distance <= sprint_noise_range * noise_multiplier
 	if visible:
 		last_known_target_position = target.global_position
 		lost_sight_timer = 0.0
 		if awareness_state == AwarenessState.IDLE or awareness_state == AwarenessState.SEARCHING:
 			awareness_state = AwarenessState.SUSPICIOUS
 		if awareness_state == AwarenessState.SUSPICIOUS:
-			suspicion += delta * (0.48 if crouched else (1.8 if distance < 4.0 else 1.0))
+			var suspicion_rate := 0.48 if crouched else (1.8 if distance < 4.0 else 1.0)
+			if in_cover:
+				suspicion_rate *= 0.32 if crouched else 0.72
+			suspicion += delta * suspicion_rate
 			if suspicion >= suspicion_threshold:
 				awareness_state = AwarenessState.ALERTED
 				ai_timer = 0.25
@@ -624,6 +637,31 @@ func _update_awareness(delta: float) -> void:
 			if lost_sight_timer >= 4.0:
 				awareness_state = AwarenessState.SEARCHING
 				search_timer = 2.6
+
+func _get_target_vision_multiplier(candidate: Node3D) -> float:
+	if not is_instance_valid(candidate):
+		return 1.0
+	var crouched: bool = bool(candidate.get("is_crouching"))
+	var covered: bool = bool(candidate.get("is_in_cover"))
+	if crouched and covered:
+		return 0.16
+	if covered:
+		return 0.58
+	if crouched:
+		return 0.52
+	return 1.0
+
+func set_stealth_cover(_zone: Area3D, entering: bool) -> void:
+	stealth_cover_count = maxi(0, stealth_cover_count + (1 if entering else -1))
+	is_in_cover = stealth_cover_count > 0
+
+func _on_cover_zone_body_entered(body: Node3D, zone: Area3D) -> void:
+	if body == self:
+		set_stealth_cover(zone, true)
+
+func _on_cover_zone_body_exited(body: Node3D, zone: Area3D) -> void:
+	if body == self:
+		set_stealth_cover(zone, false)
 
 func _target_in_vision_cone(offset: Vector3) -> bool:
 	if offset.length_squared() < 0.001:

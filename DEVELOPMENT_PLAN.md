@@ -271,3 +271,14 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Regression coverage includes crouch collision/movement, crouch concealment, and patrol waypoint movement.
 - Headless validation: combat 100/100, boss 22/22, feedback 5/5, editor import, main-scene smoke, and git diff --check passed.
 - Limitation: the guard is a single prototype NPC; no authored animation clips, cover snapping, shadow/light visibility model, or Android device validation yet.
+
+
+## M7 — Physical cover and concealment animation
+- Added three solid stealth props (two dense bushes and a supply-crate cluster) with collision geometry that blocks enemy raycast line-of-sight.
+- Added nearby concealment trigger volumes placed outside solid prop collision, so the player can take cover without entering the obstacle.
+- Crouching inside cover reduces enemy vision to 16% of normal; standing inside cover grants partial concealment only. Suspicion gain is reduced while concealed.
+- Added cover enter/exit tracking and HUD feedback (`COVERED` / `IN COVER`).
+- Refined crouch locomotion pose with a lower center of mass, bent knees, compact arm posture, and a subtle slow sneak cycle.
+- The arena directional light already casts real-time shadows; foliage and crates use the normal shadow-casting geometry. Detection currently uses physical cover occlusion and authored concealment zones rather than sampling rendered shadow pixels.
+- Headless validation: combat 104/104, boss 22/22, feedback 5/5, stealth world 5/5; editor import and main-scene smoke passed.
+- Limitation: no dynamic lighting-based stealth meter, foliage wind, or Android visual/touch validation yet.

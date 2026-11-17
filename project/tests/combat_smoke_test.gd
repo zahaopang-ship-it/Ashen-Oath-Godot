@@ -230,6 +230,17 @@ func _run() -> void:
 	_check(not crouch_player.is_sprinting and Vector2(crouch_player.velocity.x, crouch_player.velocity.z).length() < crouch_player.move_speed, "crouch disables sprint and slows movement")
 	crouch_player.set_crouching(false)
 	_check(not crouch_player.is_crouching and is_equal_approx((crouch_shape.shape as CapsuleShape3D).height, 1.8), "standing restores the normal collision capsule")
+	var cover_guard := _new_fighter("CoverGuard", Vector3.ZERO)
+	var covered_player := _new_fighter("CoveredPlayer", Vector3(0.0, 0.0, -5.0))
+	covered_player.is_crouching = true
+	covered_player.set_stealth_cover(null, true)
+	_check(covered_player.is_in_cover and covered_player.stealth_cover_count == 1, "entering a cover zone marks the player concealed")
+	_check(is_equal_approx(cover_guard._get_target_vision_multiplier(covered_player), 0.16), "crouching inside cover greatly reduces enemy vision")
+	covered_player.set_stealth_cover(null, false)
+	_check(not covered_player.is_in_cover, "leaving the final cover zone clears concealment")
+	covered_player.set_stealth_cover(null, true)
+	covered_player.is_crouching = false
+	_check(is_equal_approx(cover_guard._get_target_vision_multiplier(covered_player), 0.58), "standing in cover provides partial concealment only")
 	var crouch_guard := _new_fighter("CrouchGuard", Vector3.ZERO)
 	var crouched_intruder := _new_fighter("CrouchedIntruder", Vector3(0.0, 0.0, -7.0))
 	crouch_guard.target = crouched_intruder
@@ -373,7 +384,7 @@ func _run() -> void:
 	sprinter.call("_player_update", 0.016)
 	_check(sprinter.is_sprinting and sprinter.velocity.length() > 0.0, "keyboard sprint request works below full joystick deflection")
 
-	print("Combat tests: ", 100 - failures.size(), "/100 passed")
+	print("Combat tests: ", 104 - failures.size(), "/104 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:
