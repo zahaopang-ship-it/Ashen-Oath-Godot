@@ -10,6 +10,21 @@ var camera_pitch := -0.22
 var camera_impulse := 0.0
 var telegraph_marker: MeshInstance3D
 var telegraph_phase := 0.0
+var camera_shake_strength := 0.0
+var camera_shake_time := 0.0
+var _hitstop_generation := 0
+var _hitstop_previous_scale := 1.0
+var _hitstop_active := false
+const HITSTOP_SCALE := 0.055
+const AUDIO_EVENTS := {
+	"hit": "res://audio/impact_body.wav",
+	"deflect": "res://audio/sword_deflect.wav",
+	"mikiri": "res://audio/sword_deflect.wav",
+	"sweep_evaded": "res://audio/sword_deflect.wav",
+	"guard": "res://audio/guard_clang.wav",
+	"posture_break": "res://audio/posture_break.wav",
+	"death": "res://audio/impact_body.wav"
+}
 
 func _ready() -> void:
 	_setup_world()
@@ -21,6 +36,8 @@ func _ready() -> void:
 	enemy.telegraph_started.connect(_on_enemy_telegraph_started)
 	enemy.attack_hit.connect(_on_enemy_attack_hit)
 	player.attack_hit.connect(_on_player_attack_hit)
+	player.combat_feedback.connect(_on_combat_feedback)
+	enemy.combat_feedback.connect(_on_combat_feedback)
 	_create_telegraph_marker()
 	camera = Camera3D.new()
 	camera.name = "CombatCamera"
@@ -164,15 +181,82 @@ func _on_enemy_attack_hit(_target: Node) -> void:
 func _on_player_attack_hit(_target: Node) -> void:
 	camera_impulse = maxf(camera_impulse, 0.13)
 
+func _trigger_hitstop(duration: float, strength: float) -> void:
+	if not _hitstop_active:
+		_hitstop_previous_scale = Engine.time_scale
+		_hitstop_active = true
+	Engine.time_scale = HITSTOP_SCALE
+	_hitstop_generation += 1
+	var generation := _hitstop_generation
+	camera_shake_strength = maxf(camera_shake_strength, strength)
+	get_tree().create_timer(duration, true, false, true).timeout.connect(_restore_hitstop.bind(generation))
+
+func _restore_hitstop(generation: int) -> void:
+	if not _hitstop_active or generation != _hitstop_generation:
+		return
+	Engine.time_scale = _hitstop_previous_scale
+	_hitstop_active = false
+
+func _on_combat_feedback(kind: String, source: Node3D) -> void:
+	if not is_instance_valid(source):
+		return
+	var hitstop := 0.045
+	var shake := 0.12
+	match kind:
+		"hit":
+			hitstop = 0.052
+			shake = 0.22
+		"deflect":
+			hitstop = 0.072
+			shake = 0.34
+		"mikiri":
+			hitstop = 0.085
+			shake = 0.38
+		"sweep_evaded":
+			hitstop = 0.085
+			shake = 0.38
+		"guard":
+			hitstop = 0.025
+			shake = 0.12
+		"posture_break":
+			hitstop = 0.105
+			shake = 0.48
+		"death":
+			hitstop = 0.12
+			shake = 0.52
+	_trigger_hitstop(hitstop, shake)
+	_play_combat_sound(kind, source.global_position)
+
+func _play_combat_sound(kind: String, world_position: Vector3) -> void:
+	if not AUDIO_EVENTS.has(kind):
+		return
+	var stream := load(str(AUDIO_EVENTS[kind])) as AudioStream
+	if not stream:
+		return
+	var player_audio := AudioStreamPlayer3D.new()
+	player_audio.name = "CombatSFX"
+	player_audio.stream = stream
+	player_audio.position = world_position
+	player_audio.volume_db = -5.0 if kind in ["deflect", "mikiri", "posture_break"] else -9.0
+	player_audio.max_distance = 22.0
+	player_audio.unit_size = 7.0
+	player_audio.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	add_child(player_audio)
+	player_audio.finished.connect(player_audio.queue_free)
+	player_audio.play()
+
 func _process(delta: float) -> void:
 	if not is_instance_valid(player) or not is_instance_valid(enemy):
 		return
 	var focus := player.global_position.lerp(enemy.global_position, 0.28)
 	var desired := focus + Vector3(sin(camera_yaw) * 7.0, 4.2 + camera_pitch * 3.0, cos(camera_yaw) * 7.0)
 	camera_impulse = move_toward(camera_impulse, 0.0, delta * 0.9)
+	camera_shake_time += delta
+	camera_shake_strength = move_toward(camera_shake_strength, 0.0, delta * 2.8)
 	telegraph_phase += delta
-	var shake := Vector3(sin(telegraph_phase * 53.0), cos(telegraph_phase * 67.0), 0.0) * camera_impulse
-	camera.global_position = camera.global_position.lerp(desired + shake, 1.0 - exp(-5.0 * delta))
+	var shake := Vector3(sin(camera_shake_time * 79.0), cos(camera_shake_time * 91.0), sin(camera_shake_time * 47.0) * 0.35) * camera_shake_strength
+	var impact_nudge := Vector3(0.0, camera_impulse * 0.35, camera_impulse * 0.55)
+	camera.global_position = camera.global_position.lerp(desired + shake + impact_nudge, 1.0 - exp(-7.0 * delta))
 	if is_instance_valid(telegraph_marker) and telegraph_marker.visible:
 		var pulse := 1.0 + 0.22 * sin(telegraph_phase * 15.0)
 		telegraph_marker.scale = Vector3.ONE * pulse

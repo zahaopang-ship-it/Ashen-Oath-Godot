@@ -4,6 +4,7 @@ signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
 signal posture_broken
 signal died
+signal combat_feedback(kind: String, source: Node3D)
 
 enum CombatState { FREE, WINDUP, ACTIVE, RECOVERY, POSTURE_BROKEN, DEAD, HITSTUN }
 
@@ -322,27 +323,33 @@ func _resolve_attack_hit() -> void:
 
 func receive_strike(damage: float, posture_damage: float, attacker: Node3D, incoming_kind: String = "slash") -> String:
 	if is_dead or is_dodging:
+		if is_dodging:
+			combat_feedback.emit("evaded", self)
 		return "evaded"
 	if incoming_kind == "thrust" and is_mikiri_countering:
 		is_mikiri_countering = false
 		counter_timer = 0.0
 		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
 			attacker.receive_deflect(48.0)
+		combat_feedback.emit("mikiri", self)
 		return "mikiri"
 	if incoming_kind == "sweep" and is_sweep_evading:
 		is_sweep_evading = false
 		counter_timer = 0.0
 		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
 			attacker.receive_deflect(32.0)
+		combat_feedback.emit("sweep_evaded", self)
 		return "sweep_evaded"
 	if is_deflecting:
 		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
 			attacker.receive_deflect(40.0 if incoming_kind == "heavy" else 26.0)
+		combat_feedback.emit("deflect", self)
 		return "deflected"
 	if is_blocking:
 		var block_scale := 0.85 if incoming_kind == "heavy" else (0.72 if incoming_kind == "thrust" else 0.55)
 		posture += posture_damage * block_scale
 		_check_posture_break()
+		combat_feedback.emit("guard", self)
 		return "blocked"
 	vitality = maxf(0.0, vitality - damage)
 	posture += posture_damage
@@ -351,6 +358,7 @@ func receive_strike(damage: float, posture_damage: float, attacker: Node3D, inco
 		_die()
 	else:
 		_begin_hit_reaction(attacker)
+		combat_feedback.emit("hit", self)
 	return "hit"
 
 func receive_deflect(amount: float) -> void:
@@ -370,6 +378,7 @@ func _check_posture_break() -> void:
 		deflect_timer = 0.0
 		is_deflecting = false
 		posture_broken.emit()
+		combat_feedback.emit("posture_break", self)
 
 func _die() -> void:
 	is_dead = true
@@ -377,6 +386,7 @@ func _die() -> void:
 	attack_phase_changed.emit("finished")
 	is_blocking = false
 	velocity = Vector3.ZERO
+	combat_feedback.emit("death", self)
 	died.emit()
 
 func begin_mikiri_counter() -> bool:

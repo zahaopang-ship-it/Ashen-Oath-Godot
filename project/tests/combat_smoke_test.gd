@@ -140,6 +140,23 @@ func _run() -> void:
 	animated.call("_update_combat_animation", 0.05)
 	_check(upper.rotation.x > 0.05, "death state drives a collapse pose")
 
+	var feedback_log: Array[String] = []
+	var feedback_receiver := _new_fighter("FeedbackReceiver", Vector3.ZERO)
+	var feedback_source := _new_fighter("FeedbackSource", Vector3(0, 0, -1))
+	feedback_receiver.combat_feedback.connect(func(kind: String, _source: Node3D) -> void: feedback_log.append(kind))
+	feedback_receiver.receive_strike(8.0, 5.0, feedback_source)
+	_check(feedback_log.has("hit"), "successful vitality hit emits combat feedback")
+	feedback_receiver.end_block()
+	var feedback_guard := _new_fighter("FeedbackGuard", Vector3.ZERO)
+	feedback_guard.combat_feedback.connect(func(kind: String, _source: Node3D) -> void: feedback_log.append(kind))
+	feedback_guard.begin_deflect()
+	feedback_guard.receive_strike(8.0, 5.0, feedback_source)
+	_check(feedback_log.has("deflect"), "perfect deflect emits combat feedback")
+	_check(ResourceLoader.exists("res://audio/impact_body.wav"), "original body impact sound is included")
+	_check(ResourceLoader.exists("res://audio/sword_deflect.wav"), "original sword deflect sound is included")
+	_check(ResourceLoader.exists("res://audio/guard_clang.wav"), "original guard clang sound is included")
+	_check(ResourceLoader.exists("res://audio/posture_break.wav"), "original posture break sound is included")
+
 	var combo := _new_fighter("ComboPlayer", Vector3.ZERO)
 	combo.is_player = true
 	_check(combo.request_player_attack(), "first combo input starts a slash")
@@ -167,7 +184,7 @@ func _run() -> void:
 	_check(dodger.is_dodging, "dodge grants an active evasion window")
 	_check(dodger.receive_strike(20.0, 20.0, attacker) == "evaded", "dodge window evades incoming strike")
 
-	print("Combat tests: ", 50 - failures.size(), "/50 passed")
+	print("Combat tests: ", 56 - failures.size(), "/56 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:

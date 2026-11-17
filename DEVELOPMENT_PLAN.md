@@ -74,7 +74,8 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - [x] Deflect window (200 ms), post-deflect lockout, held-guard fallback, and posture pressure.
 - [x] Posture threshold enters a timed broken state; vitality-dependent posture recovery.
 - [x] Independent touch pointer tracking for movement, camera, and action-button fingers; keyboard debug controls (WASD/J/K/L/Space).
-- [x] Headless combat logic suite: 50 assertions passing (including attack hit-volume and combo-buffer checks).
+- [x] Headless combat logic suite: 56 assertions passing (including attack hit-volume, combo-buffer, and feedback-event checks).
+- [x] Feedback integration suite: 3/3 checks (hitstop activation/restoration and spatial sound node creation).
 - [ ] Validate simultaneous touch on a physical Android device; headless tests cannot prove touch-driver behavior.
 - [x] Add a visible pulsing enemy windup marker and light camera impact feedback on confirmed hits.
 - [x] Add short directional hitstun/recoil and a temporary material flash for unblocked hits.
@@ -87,7 +88,9 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - [x] Three-step slash/slash/heavy combo with a 0.58-second buffered input window.
 - [x] Attack-specific forward hit volumes evaluated during active frames (narrow thrust, wide sweep, standard slash, heavy).
 - [ ] Stomp and dodge/grab.
-- [ ] Hitstop, camera impulse polish, and impact audio.
+- [x] Short hitstop on hit, deflect, Mikiri/sweep counter, posture break, and death.
+- [x] Stronger decaying camera shake and impact nudge tuned by combat event.
+- [x] Original generated spatial SFX for body impact, sword deflect, guard clang, and posture break.
 - Enemy archetypes and combat state machine.
 - Gate: no stuck states; each attack type has a valid counter and punish path.
 
@@ -113,7 +116,7 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 
 ## Current known limitations
 - Fighters are still procedural capsules and the arena is a greybox; no production character/environment assets or animation have been integrated.
-- Combat M1 is still a prototype: the telegraph is a simple emissive marker, camera feedback is a lightweight impulse, and there are no animation-driven hitboxes, authored hit-reaction animations, spatial audio, boss, or Android export yet.
+- Combat is still a prototype: hit volumes are deterministic local-space gameplay boxes rather than weapon-bone swept collision; combat SFX are synthesized placeholders; no authored animation clips, boss, or Android export yet.
 - The Linux container has no graphical desktop or physical touchscreen; Android rendering, safe areas, and true simultaneous multitouch remain unverified.
 - GitHub repository: https://github.com/zahaopang-ship-it/Ashen-Oath-Godot (private), branch `main`. Push every stable checkpoint here; never use an unrelated repository.
 
@@ -145,3 +148,14 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Buffered inputs expire cleanly; the combo chain resets after 0.95 seconds without continuation.
 - Added headless tests for rear rejection, thrust lateral rejection, sweep lateral coverage, combo buffering, finisher, and expiry.
 - Hit volumes are currently deterministic local-space gameplay volumes, not weapon-bone swept collision or animation-authored Area3D hitboxes.
+
+
+## M2 — Hitstop, impact camera, and combat audio
+- Added event-driven combat feedback signals for hits, deflects, guards, Mikiri/sweep counters, posture breaks, and death.
+- Added brief global hitstop with unscaled SceneTree timers and generation tokens, so stale callbacks cannot prematurely restore Engine.time_scale after a newer impact.
+- Tuned event-specific hitstop durations and camera shake strengths; counter and posture-break events receive stronger emphasis.
+- Added four original synthesized WAV effects and play them through temporary AudioStreamPlayer3D nodes at the combatant position with distance attenuation.
+- Verified all four audio resources are present and combat feedback signals fire in headless tests.
+- No commercial/third-party sound assets were copied; these are procedural placeholder SFX pending final sound design.
+
+- Feedback integration test: `project/tests/feedback_integration_test.gd` verifies hitstop activation/restoration and 3D impact audio node creation in a live headless scene.
