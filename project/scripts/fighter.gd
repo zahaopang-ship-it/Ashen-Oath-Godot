@@ -41,6 +41,8 @@ var _upper_body: Node3D
 var _weapon_pivot: Node3D
 var _left_leg_pivot: Node3D
 var _right_leg_pivot: Node3D
+var _left_arm_pivot: Node3D
+var _right_arm_pivot: Node3D
 var _combat_anim_time := 0.0
 var _gait_phase := 0.0
 var _locomotion_bob := 0.0
@@ -176,11 +178,13 @@ func set_body_material(material: StandardMaterial3D) -> void:
 	if _body_material:
 		_body_material.set_meta("base_color", _body_material.albedo_color)
 
-func set_animation_rig(upper_body: Node3D, weapon_pivot: Node3D, left_leg: Node3D = null, right_leg: Node3D = null) -> void:
+func set_animation_rig(upper_body: Node3D, weapon_pivot: Node3D, left_leg: Node3D = null, right_leg: Node3D = null, left_arm: Node3D = null, right_arm: Node3D = null) -> void:
 	_upper_body = upper_body
 	_weapon_pivot = weapon_pivot
 	_left_leg_pivot = left_leg
 	_right_leg_pivot = right_leg
+	_left_arm_pivot = left_arm
+	_right_arm_pivot = right_arm
 
 func _update_combat_animation(delta: float) -> void:
 	_combat_anim_time += delta
@@ -188,6 +192,8 @@ func _update_combat_animation(delta: float) -> void:
 		return
 	var body_pose := Vector3(0.0, 0.0, 0.0)
 	var weapon_pose := Vector3(0.0, 0.0, -0.18)
+	var left_arm_pose := Vector3(0.0, 0.0, 0.10)
+	var right_arm_pose := Vector3(0.0, 0.0, -0.12)
 	var body_offset := Vector3.ZERO
 	var left_leg_pose := 0.0
 	var right_leg_pose := 0.0
@@ -244,6 +250,8 @@ func _update_combat_animation(delta: float) -> void:
 			"ashen_rend":
 				body_pose = Vector3(-0.62, 0.0, -0.24) * anticipation
 				weapon_pose = Vector3(-2.05, 0.0, -0.82) * anticipation
+		left_arm_pose = Vector3(-0.18, 0.0, 0.28) * anticipation
+		right_arm_pose = Vector3(-0.32, 0.0, -0.42) * anticipation
 	elif state == CombatState.ACTIVE:
 		var progress := 1.0 - clampf(attack_timer / ACTIVE_TIME, 0.0, 1.0)
 		var follow := sin(progress * PI)
@@ -266,43 +274,73 @@ func _update_combat_animation(delta: float) -> void:
 			"ashen_rend":
 				body_pose = Vector3(0.52, 0.0, 0.72) * follow
 				weapon_pose = Vector3(2.15, 0.0, 1.55) * follow
+		left_arm_pose = Vector3(0.20, 0.0, -0.20) * follow
+		right_arm_pose = Vector3(0.22, 0.0, 0.36) * follow
 	elif state == CombatState.RECOVERY:
+		left_arm_pose = Vector3(0.05, 0.0, 0.12)
+		right_arm_pose = Vector3(0.12, 0.0, -0.08)
 		body_pose = Vector3(0.08, 0.0, 0.08)
 		weapon_pose = Vector3(0.18, 0.0, -0.10)
+		left_arm_pose = Vector3(-0.08, 0.0, 0.14)
+		right_arm_pose = Vector3(0.12, 0.0, -0.18)
 	elif state == CombatState.HITSTUN:
+		left_arm_pose = Vector3(-0.55, 0.0, 0.48)
+		right_arm_pose = Vector3(-0.42, 0.0, -0.50)
 		body_pose = Vector3(-0.42, 0.0, 0.0)
 		weapon_pose = Vector3(0.55, 0.0, 0.3)
 		body_offset = Vector3(0.0, 0.0, 0.12)
+		left_arm_pose = Vector3(-0.48, 0.0, 0.42)
+		right_arm_pose = Vector3(-0.42, 0.0, -0.38)
 	elif state == CombatState.POSTURE_BROKEN:
+		left_arm_pose = Vector3(0.42, 0.0, 0.58)
+		right_arm_pose = Vector3(0.35, 0.0, -0.52)
 		body_pose = Vector3(0.62 + sin(_combat_anim_time * 13.0) * 0.06, 0.0, 0.0)
 		weapon_pose = Vector3(0.85, 0.0, 0.0)
+		left_arm_pose = Vector3(0.38, 0.0, 0.48)
+		right_arm_pose = Vector3(0.32, 0.0, -0.42)
 	elif state == CombatState.EXECUTING:
 		var execution_progress := 1.0 - clampf(execution_timer / 0.82, 0.0, 1.0)
 		if deathblow_executed:
+			left_arm_pose = Vector3(0.45, 0.0, 0.62)
+			right_arm_pose = Vector3(0.52, 0.0, -0.62)
 			# Victim folds forward, then drops as the execution completes.
 			var collapse := smoothstep(0.28, 1.0, execution_progress)
 			body_pose = Vector3(0.28 + collapse * 0.92, 0.0, 0.08)
 			weapon_pose = Vector3(0.35 + collapse * 0.48, 0.0, 0.12)
 			body_offset = Vector3(0.0, -0.10 * collapse, 0.10 * execution_progress)
 		else:
+			left_arm_pose = Vector3(-0.20, 0.0, 0.38)
+			right_arm_pose = Vector3(-0.52, 0.0, -0.48)
 			# Attacker draws back, drives in, and holds the finishing follow-through.
 			var strike := sin(clampf(execution_progress / 0.62, 0.0, 1.0) * PI)
 			body_pose = Vector3(-0.22 + strike * 0.38, 0.0, -0.10 + execution_progress * 0.20)
 			weapon_pose = Vector3(-0.95 + strike * 1.85, 0.0, -0.35 + execution_progress * 0.72)
+		left_arm_pose = Vector3(0.15, 0.0, 0.48)
+		right_arm_pose = Vector3(0.12, 0.0, -0.52)
 	elif state == CombatState.DEAD:
+		left_arm_pose = Vector3(0.65, 0.0, 0.72)
+		right_arm_pose = Vector3(0.72, 0.0, -0.68)
 		body_pose = Vector3(1.35, 0.0, 0.0)
 		weapon_pose = Vector3(0.4, 0.0, 0.0)
 	elif is_blocking:
+		left_arm_pose = Vector3(-0.22, 0.0, 0.36)
+		right_arm_pose = Vector3(-0.48, 0.0, -0.38)
 		body_pose = Vector3(-0.08, 0.0, 0.0)
 		weapon_pose = Vector3(-0.42, 0.0, -0.32)
 	elif is_dodging:
+		left_arm_pose = Vector3(0.38, 0.0, 0.45)
+		right_arm_pose = Vector3(0.30, 0.0, -0.42)
 		body_pose = Vector3(0.25, 0.0, 0.0)
 		body_offset = Vector3(0.0, -0.13, 0.0)
 		weapon_pose = Vector3(0.25, 0.0, -0.24)
 	elif is_mikiri_countering:
+		left_arm_pose = Vector3(-0.18, 0.0, 0.32)
+		right_arm_pose = Vector3(-0.58, 0.0, -0.52)
 		body_pose = Vector3(-0.16, 0.0, 0.0)
 		weapon_pose = Vector3(-0.28, 0.0, -0.5)
 	elif is_sweep_evading:
+		left_arm_pose = Vector3(0.28, 0.0, 0.42)
+		right_arm_pose = Vector3(0.12, 0.0, -0.32)
 		body_pose = Vector3(0.35, 0.0, 0.0)
 		weapon_pose = Vector3(-0.35, 0.0, -0.2)
 	else:
@@ -311,12 +349,20 @@ func _update_combat_animation(delta: float) -> void:
 		body_pose = Vector3(0.025 * idle_breath + walk_sway * 0.035, 0.0, 0.025 * sin(_combat_anim_time * 1.7) + gait_blend * (0.035 if is_sprinting else 0.015))
 		body_offset = Vector3(0.0, _locomotion_bob, 0.0)
 		weapon_pose = Vector3(0.0, 0.0, -0.18 + 0.035 * sin(_combat_anim_time * 2.0) + walk_sway * 0.045)
+		left_arm_pose = Vector3(0.035 * sin(_combat_anim_time * 2.0), 0.0, 0.10 + walk_sway * 0.12)
+		right_arm_pose = Vector3(-0.04 * sin(_combat_anim_time * 2.0), 0.0, -0.12 - walk_sway * 0.10)
 		if not is_player:
 			weapon_pose.x -= 0.10
 			body_pose.z += 0.025
+			left_arm_pose.z += 0.08
+			right_arm_pose.z -= 0.06
 	_upper_body.rotation = _upper_body.rotation.lerp(body_pose, weight)
 	_upper_body.position = _upper_body.position.lerp(body_offset, weight)
 	_weapon_pivot.rotation = _weapon_pivot.rotation.lerp(weapon_pose, weight)
+	if is_instance_valid(_left_arm_pivot):
+		_left_arm_pivot.rotation = _left_arm_pivot.rotation.lerp(left_arm_pose, weight)
+	if is_instance_valid(_right_arm_pivot):
+		_right_arm_pivot.rotation = _right_arm_pivot.rotation.lerp(right_arm_pose, weight)
 
 func _begin_hit_reaction(attacker: Node3D) -> void:
 	if state == CombatState.POSTURE_BROKEN or is_dead:

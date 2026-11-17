@@ -126,31 +126,83 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	head.position.y = 1.95
 	head.material_override = mat
 	upper_body.add_child(head)
+	var arm_material := StandardMaterial3D.new()
+	arm_material.albedo_color = Color(0.12, 0.18, 0.23) if player_controlled else Color(0.16, 0.055, 0.05)
+	arm_material.roughness = 0.86
+	var left_arm := _make_arm_pivot(upper_body, "LeftArmPivot", -0.39, arm_material)
+	var right_arm := _make_arm_pivot(upper_body, "RightArmPivot", 0.39, arm_material)
 	var weapon_pivot := Node3D.new()
 	weapon_pivot.name = "WeaponPivot"
-	weapon_pivot.position = Vector3(0.42, 1.18, -0.05)
-	upper_body.add_child(weapon_pivot)
+	weapon_pivot.position = Vector3(0.02, -0.84, -0.02)
+	right_arm.add_child(weapon_pivot)
 	var blade := MeshInstance3D.new()
 	var blade_mesh := BoxMesh.new()
-	blade_mesh.size = Vector3(0.07, 0.9, 0.10)
+	blade_mesh.size = Vector3(0.065, 0.92, 0.075)
 	blade.mesh = blade_mesh
-	blade.position = Vector3(0.0, 0.43, 0.0)
-	blade.rotation.z = -0.25
+	blade.position = Vector3(0.0, 0.48, -0.06)
+	blade.rotation.z = -0.16
 	var blade_mat := StandardMaterial3D.new()
 	blade_mat.albedo_color = Color(0.72, 0.78, 0.82)
 	blade_mat.metallic = 0.78
 	blade.material_override = blade_mat
 	weapon_pivot.add_child(blade)
+	var grip := MeshInstance3D.new()
+	var grip_mesh := CylinderMesh.new()
+	grip_mesh.top_radius = 0.045
+	grip_mesh.bottom_radius = 0.045
+	grip_mesh.height = 0.34
+	grip.mesh = grip_mesh
+	grip.position = Vector3(0.0, -0.08, 0.0)
+	grip.material_override = armor_material_for_grip()
+	weapon_pivot.add_child(grip)
 	var leg_material := StandardMaterial3D.new()
 	leg_material.albedo_color = Color(0.075, 0.09, 0.105) if player_controlled else Color(0.095, 0.065, 0.06)
 	leg_material.roughness = 0.9
 	var left_leg := _make_leg_pivot(body, "LeftLegPivot", -0.19, leg_material)
 	var right_leg := _make_leg_pivot(body, "RightLegPivot", 0.19, leg_material)
-	body.set_animation_rig(upper_body, weapon_pivot, left_leg, right_leg)
+	body.set_animation_rig(upper_body, weapon_pivot, left_leg, right_leg, left_arm, right_arm)
 	if not player_controlled:
 		_add_boss_armor(body, upper_body)
 	return body
 
+
+
+func _make_arm_pivot(parent: Node3D, label: String, x: float, material: Material) -> Node3D:
+	var pivot := Node3D.new()
+	pivot.name = label
+	pivot.position = Vector3(x, 1.48, 0.0)
+	parent.add_child(pivot)
+	var upper_arm := MeshInstance3D.new()
+	var upper_shape := CapsuleMesh.new()
+	upper_shape.radius = 0.13
+	upper_shape.height = 0.66
+	upper_arm.mesh = upper_shape
+	upper_arm.position = Vector3(0.0, -0.27, 0.0)
+	upper_arm.material_override = material
+	pivot.add_child(upper_arm)
+	var forearm := MeshInstance3D.new()
+	var forearm_shape := CapsuleMesh.new()
+	forearm_shape.radius = 0.105
+	forearm_shape.height = 0.56
+	forearm.mesh = forearm_shape
+	forearm.position = Vector3(0.0, -0.66, -0.015)
+	forearm.material_override = material
+	pivot.add_child(forearm)
+	var hand := MeshInstance3D.new()
+	var hand_shape := SphereMesh.new()
+	hand_shape.radius = 0.12
+	hand_shape.height = 0.22
+	hand.mesh = hand_shape
+	hand.position = Vector3(0.0, -0.92, -0.035)
+	hand.material_override = material
+	pivot.add_child(hand)
+	return pivot
+
+func armor_material_for_grip() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.19, 0.11, 0.075)
+	material.roughness = 0.82
+	return material
 
 func _make_leg_pivot(parent: Node3D, label: String, x: float, material: Material) -> Node3D:
 	var pivot := Node3D.new()

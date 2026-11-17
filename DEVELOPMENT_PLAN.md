@@ -212,3 +212,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Boss locomotion has a heavier cadence and a more forceful Phase II stride; its idle weapon/body stance is distinct from the player.
 - Added five regression assertions for gait phase, alternating legs, body bounce, attack-state suppression, and return to idle. Headless combat suite: 72/72; boss suite: 22/22; feedback integration: 3/3.
 - Limitation: this is still procedural animation on primitive meshes, without foot IK, root-motion clips, authored skeletal animation, or Android visual validation.
+
+## M3 — Procedural upper-body, arm, and weapon articulation
+- Added separate left/right shoulder pivots with upper-arm, forearm, and hand meshes; the katana grip is now attached to the right-hand/weapon pivot rather than floating independently beside the torso.
+- Added state-driven arm poses for neutral guard, attack anticipation and follow-through, recovery, hitstun, posture break, dodge/counters, death, and the paired deathblow sequence.
+- The weapon retains its existing attack-specific rotation layered beneath the arm pivot, so the arm carries the sword while the blade still receives its combat pose.
+- Added regression checks confirming both arm pivots respond to attack anticipation and the weapon arm assumes a defensive angle during guard.
+- Headless validation: combat 74/74, boss 22/22, feedback integration 3/3, editor import and main-scene smoke passed.
+- Limitation: these are procedural primitive arm segments and transform poses, not skinned mesh deformation, hand IK, authored animation clips, or Android visual validation. Weapon collision remains the existing gameplay hit-volume system.

@@ -146,11 +146,15 @@ func _run() -> void:
 	var gait_weapon := Node3D.new()
 	var left_leg := Node3D.new()
 	var right_leg := Node3D.new()
+	var left_arm := Node3D.new()
+	var right_arm := Node3D.new()
 	gait_fighter.add_child(gait_upper)
 	gait_upper.add_child(gait_weapon)
 	gait_fighter.add_child(left_leg)
 	gait_fighter.add_child(right_leg)
-	gait_fighter.set_animation_rig(gait_upper, gait_weapon, left_leg, right_leg)
+	gait_fighter.add_child(left_arm)
+	gait_fighter.add_child(right_arm)
+	gait_fighter.set_animation_rig(gait_upper, gait_weapon, left_leg, right_leg, left_arm, right_arm)
 	gait_fighter.velocity = Vector3(0.0, 0.0, -5.0)
 	gait_fighter.call("_update_combat_animation", 0.12)
 	_check(gait_fighter._gait_phase > 0.0, "locomotion advances a continuous gait phase")
@@ -163,6 +167,14 @@ func _run() -> void:
 	gait_fighter.velocity = Vector3.ZERO
 	gait_fighter.call("_update_combat_animation", 0.2)
 	_check(absf(left_leg.rotation.x) < 0.1 and absf(right_leg.rotation.x) < 0.1, "legs settle back to idle when movement stops")
+	gait_fighter.start_attack("slash")
+	gait_fighter.attack_timer = 0.18
+	gait_fighter.call("_update_combat_animation", 0.06)
+	_check(absf(right_arm.rotation.x) > 0.05 and absf(left_arm.rotation.x) > 0.05, "attack anticipation coordinates both arm pivots")
+	gait_fighter.state = 0
+	gait_fighter.is_blocking = true
+	gait_fighter.call("_update_combat_animation", 0.06)
+	_check(right_arm.rotation.z < -0.05, "guard pose raises the weapon arm into a defensive angle")
 
 	var feedback_log: Array[String] = []
 	var feedback_receiver := _new_fighter("FeedbackReceiver", Vector3.ZERO)
@@ -246,7 +258,7 @@ func _run() -> void:
 	sprinter.call("_player_update", 0.016)
 	_check(sprinter.is_sprinting and sprinter.velocity.length() > sprinter.move_speed * 0.6 * 1.2, "keyboard sprint request works below full joystick deflection")
 
-	print("Combat tests: ", 72 - failures.size(), "/72 passed")
+	print("Combat tests: ", 74 - failures.size(), "/74 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:
