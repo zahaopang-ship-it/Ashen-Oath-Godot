@@ -359,3 +359,19 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Completing a grapple arms one contextual heavy aerial follow-up when an enemy is within 3.1 m and in front. Added touch controls and keyboard G (grapple), T (aerial follow-up), Y (resurrection), and F (jump); the existing touch JUMP action now performs a real jump.
 - Tests cover resurrection charge, health/posture restoration, checkpoint return, immunity, non-player rejection, anchor targeting, arc completion, physical displacement, aerial follow-up, and rear-anchor rejection.
 - Limitation: resurrection charge is a prototype per-player resource and does not yet refill from deathblows/rest points or persist in saves. Grapple anchors are fixed test-arena points; there is no rope mesh, swing physics, enemy grapple execution, authored traversal animation, or Android device validation yet.
+
+## M17 — Swimming, marked wall climbing, and ledge hanging
+- Completed the traversal work already present in the working tree and added a dedicated traversal regression suite. The arena now includes a shallow training pond with Area3D enter/exit detection and a visible water surface; swimming uses a reduced collision capsule, horizontal joystick movement, buoyancy toward the surface, and explicit touchscreen SURFACE/DIVE hold controls.
+- Added explicit `climbable_surfaces` marking so vertical climbing is restricted to authored climbable geometry rather than arbitrary walls. The climb action toggles attachment/cancellation, and the player moves vertically along the wall with a collision probe maintaining contact.
+- Added airborne ledge catches with wall/top probes, a stable hang state, joystick up to mantle onto the safe side, and joystick down to drop. Fixed the top-surface probe offset and extended the landing ray so it can find ground below raised ledges.
+- Added regression coverage for water-state/capsule transitions, vertical swim controls, marked-vs-unmarked climbing, upward climb movement, ledge catch/hang/mantle, and live arena water trigger entry/exit.
+- Headless traversal suite: 18/18 expected after final integration; full regression, editor import, main-scene smoke, and `git diff --check` must pass before this milestone is committed.
+- Limitations: swimming is a simple buoyant movement prototype with no strokes, underwater camera/post-processing, oxygen, or water combat. Climbing uses a single surface normal and does not yet support corner transitions or stamina. Ledge hang/mantle uses procedural movement, not authored animation. Android touch, rendering, and performance validation remain pending.
+
+
+## M17 — Swimming, vertical climbing, and ledge hanging
+- Added a water volume and translucent training pond surface. Entering the volume switches to a shorter collision capsule and swim movement with buoyancy toward the surface; horizontal steering uses the movement stick and vertical movement uses SWIM UP/DOWN (keyboard PageUp/PageDown). Exiting restores the standing capsule.
+- Added explicitly tagged climbable surfaces. A forward ray selects a wall; the player can climb vertically using the movement stick and disengage with comma. Unmarked walls are not climbable.
+- Added an airborne ledge catch with wall/top-surface probes and a stable hanging state. Upward stick input mantles onto the detected top surface; downward input releases the ledge. The arena includes a marked climb wall and training pond.
+- Regression tests cover water volume registration, swim profile/movement/exit, climbable wall targeting and vertical movement, ledge catch/hang, mantle transition and landing.
+- Limitation: swimming is a shallow-water prototype without underwater camera, breath/drowning, buoyancy simulation or swim animations. Climbing is a tagged vertical-wall mechanic, not freeform rock climbing. Ledge detection uses simple ray probes and does not yet support corner shimming, hand IK, authored animation or Android device validation.

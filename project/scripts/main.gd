@@ -50,8 +50,11 @@ func _ready() -> void:
 	_create_grapple_point(Vector3(-2.5, 5.2, 0.0), "GrappleAnchorWest")
 	_create_grapple_point(Vector3(2.5, 5.8, -5.5), "GrappleAnchorNorth")
 	_create_grapple_point(Vector3(7.0, 4.8, 1.5), "GrappleAnchorEast")
+	_create_water_zone(Vector3(9.0, -0.15, -7.0), Vector3(5.0, 1.4, 7.0), "TrainingPond")
+	_create_climb_wall(Vector3(11.8, 2.0, 2.0), Vector3(0.55, 4.0, 7.0), "ClimbableTowerWall")
 	enemy = boss
 	player.target = enemy
+	player_entered_water_connect()
 	player.set_checkpoint(Vector3(0.0, 0.0, 4.0))
 	enemy.target = player
 	boss.boss_phase_changed.connect(_on_boss_phase_changed)
@@ -510,11 +513,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_G: player.try_grapple()
 			KEY_T: player.aerial_grapple_attack()
 			KEY_Y: player.resurrect()
+			KEY_N: player.try_vertical_climb()
+			KEY_COMMA: player.stop_vertical_climb()
+			KEY_PERIOD: player.try_ledge_grab()
+			KEY_PAGEUP: player.swim_vertical_input = 1.0
+			KEY_PAGEDOWN: player.swim_vertical_input = -1.0
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:
 		if event.keycode == KEY_K: player.end_deflect()
 		if event.keycode == KEY_L: player.end_block()
+		if event.keycode in [KEY_PAGEUP, KEY_PAGEDOWN]: player.swim_vertical_input = 0.0
 	var move := Vector2.ZERO
 	if Input.is_key_pressed(KEY_A): move.x -= 1.0
 	if Input.is_key_pressed(KEY_D): move.x += 1.0
@@ -526,6 +535,67 @@ func _unhandled_input(event: InputEvent) -> void:
 func rotate_camera(delta_x: float, delta_y: float) -> void:
 	camera_yaw -= delta_x * 0.004
 	camera_pitch = clampf(camera_pitch - delta_y * 0.003, -0.65, 0.15)
+
+func player_entered_water_connect() -> void:
+	for zone in get_tree().get_nodes_in_group("water_zones"):
+		zone.body_entered.connect(_on_water_body_entered.bind(zone))
+		zone.body_exited.connect(_on_water_body_exited.bind(zone))
+
+func _on_water_body_entered(body: Node3D, zone: Area3D) -> void:
+	if body == player:
+		player.enter_water(zone.global_position.y + 0.7)
+
+func _on_water_body_exited(body: Node3D, _zone: Area3D) -> void:
+	if body == player:
+		player.exit_water()
+
+func _create_water_zone(pos: Vector3, dimensions: Vector3, label: String) -> void:
+	var water := Area3D.new()
+	water.name = label
+	water.position = pos
+	water.add_to_group("water_zones")
+	var shape_node := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = dimensions
+	shape_node.shape = shape
+	water.add_child(shape_node)
+	var surface := MeshInstance3D.new()
+	var plane := BoxMesh.new()
+	plane.size = Vector3(dimensions.x, 0.06, dimensions.z)
+	surface.mesh = plane
+	surface.position.y = dimensions.y * 0.5
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.06, 0.28, 0.38, 0.72)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.metallic = 0.25
+	material.roughness = 0.18
+	material.emission_enabled = true
+	material.emission = Color(0.02, 0.12, 0.18)
+	surface.material_override = material
+	water.add_child(surface)
+	add_child(water)
+
+func _create_climb_wall(pos: Vector3, dimensions: Vector3, label: String) -> void:
+	var wall := StaticBody3D.new()
+	wall.name = label
+	wall.position = pos
+	wall.add_to_group("climbable_surfaces")
+	add_child(wall)
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = dimensions
+	collision.shape = shape
+	wall.add_child(collision)
+	var visual := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = dimensions
+	visual.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.24, 0.30, 0.34)
+	material.emission_enabled = true
+	material.emission = Color(0.04, 0.12, 0.16)
+	visual.material_override = material
+	wall.add_child(visual)
 
 func _create_grapple_point(pos: Vector3, label: String) -> void:
 	var anchor := Area3D.new()

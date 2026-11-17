@@ -132,6 +132,15 @@ var resurrection_invulnerability := 0.0
 var resurrection_available := true
 var checkpoint_position := Vector3.ZERO
 var is_grappling := false
+var is_swimming := false
+var is_climbing := false
+var is_ledge_hanging := false
+var _climb_normal := Vector3.ZERO
+var _ledge_hang_position := Vector3.ZERO
+var _water_surface_y := 0.0
+var swim_speed := 3.2
+var swim_vertical_input := 0.0
+var climb_speed := 2.5
 var grapple_target: Node3D
 var _grapple_start := Vector3.ZERO
 var _grapple_end := Vector3.ZERO
@@ -163,6 +172,14 @@ const ATTACK_BUFFER_WINDOW := 0.58
 const COMBO_RESET_TIME := 0.95
 
 func _physics_process(delta: float) -> void:
+	if is_ledge_hanging:
+		_update_ledge_hang(delta)
+		_update_combat_animation(delta)
+		return
+	if is_climbing:
+		_update_vertical_climb(delta)
+		_update_combat_animation(delta)
+		return
 	if is_grappling:
 		_update_grapple(delta)
 		_update_combat_animation(delta)
@@ -238,11 +255,24 @@ func _physics_process(delta: float) -> void:
 		var vitality_factor := lerpf(0.35, 1.0, clampf(vitality / maxf(1.0, max_vitality), 0.0, 1.0))
 		posture = maxf(0.0, posture - 8.0 * vitality_factor * delta)
 	_update_combat_animation(delta)
-	if not is_on_floor():
-		velocity.y -= gravity * delta
+	if is_swimming:
+		var swim_input := Vector3(input_move.x, 0.0, input_move.y)
+		var swim_direction := global_transform.basis * swim_input
+		swim_direction.y = 0.0
+		if swim_direction.length_squared() > 1.0:
+			swim_direction = swim_direction.normalized()
+		velocity.x = move_toward(velocity.x, swim_direction.x * swim_speed, movement_acceleration * 0.55 * delta)
+		velocity.z = move_toward(velocity.z, swim_direction.z * swim_speed, movement_acceleration * 0.55 * delta)
+		var vertical_input := swim_vertical_input + Input.get_action_strength("ui_up") - Input.get_action_strength("ui_down")
+		velocity.y = move_toward(velocity.y, clampf(vertical_input, -1.0, 1.0) * swim_speed * 0.72, 8.0 * delta)
+		velocity.y += clampf((_water_surface_y - 0.85) - global_position.y, -1.5, 1.5) * 1.8 * delta
+		move_and_slide()
 	else:
-		velocity.y = 0.0
-	move_and_slide()
+		if not is_on_floor():
+			velocity.y -= gravity * delta
+		else:
+			velocity.y = 0.0
+		move_and_slide()
 
 func _update_attack_state(delta: float) -> void:
 	attack_timer -= delta
@@ -583,6 +613,10 @@ func _begin_hit_reaction(attacker: Node3D, incoming_kind: String = "slash") -> v
 			velocity.z = away.z * knockback
 
 func _player_update(delta: float) -> void:
+	if is_swimming:
+		is_sprinting = false
+		sprint_requested = false
+		return
 	if is_vaulting:
 		return
 	if state != CombatState.FREE:
@@ -1424,6 +1458,125 @@ func _die() -> void:
 	combat_feedback.emit("death", self)
 	died.emit()
 
+func set_swim_vertical_input(value: float) -> void:
+	swim_vertical_input = clampf(value, -1.0, 1.0) if is_swimming else 0.0
+
+func enter_water(surface_y: float) -> void:
+	if not is_player or is_dead:
+		return
+	is_swimming = true
+	swim_vertical_input = 0.0
+	_water_surface_y = surface_y
+	is_crouching = false
+	is_sprinting = false
+	sprint_requested = false
+	if is_instance_valid(body_collision) and body_collision.shape is CapsuleShape3D:
+		body_collision.shape.height = 1.25
+		body_collision.position.y = 0.68
+
+func exit_water() -> void:
+	if not is_swimming:
+		return
+	is_swimming = false
+	swim_vertical_input = 0.0
+	velocity.y = maxf(velocity.y, 1.0)
+	if is_instance_valid(body_collision) and body_collision.shape is CapsuleShape3D:
+		body_collision.shape.height = 1.8
+		body_collision.position.y = 0.9
+
+func try_vertical_climb() -> bool:
+	if not is_player or is_dead or state != CombatState.FREE or is_swimming or is_grappling or is_vaulting or is_wall_hugging:
+		return false
+	var forward := -global_transform.basis.z.normalized()
+	var origin := global_position + Vector3.UP * 0.95
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + forward * 0.9)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty() or absf((hit.normal as Vector3).y) > 0.25:
+		return false
+	var climb_collider: Object = hit.get("collider")
+	if not is_instance_valid(climb_collider) or not climb_collider.is_in_group("climbable_surfaces"):
+		return false
+	_climb_normal = (hit.normal as Vector3).normalized()
+	is_climbing = true
+	is_crouching = false
+	is_sprinting = false
+	velocity = Vector3.ZERO
+	return true
+
+func stop_vertical_climb() -> void:
+	if not is_climbing:
+		return
+	is_climbing = false
+	_climb_normal = Vector3.ZERO
+	velocity = Vector3(0.0, -1.2, 0.0)
+
+func _update_vertical_climb(delta: float) -> void:
+	if _climb_normal.length_squared() < 0.5:
+		stop_vertical_climb()
+		return
+	var origin := global_position + Vector3.UP * 0.95
+	var query := PhysicsRayQueryParameters3D.create(origin, origin - _climb_normal * 1.05)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		stop_vertical_climb()
+		return
+	var vertical := -input_move.y
+	velocity = Vector3.UP * vertical * climb_speed - _climb_normal * 0.35
+	move_and_slide()
+
+func try_ledge_grab() -> bool:
+	if not is_player or is_dead or is_on_floor() or is_swimming or is_grappling or is_climbing or is_ledge_hanging or state != CombatState.FREE:
+		return false
+	if velocity.y > 1.5 or velocity.y < -8.5:
+		return false
+	var forward := -global_transform.basis.z.normalized()
+	var chest := global_position + Vector3.UP * 1.35
+	var wall_query := PhysicsRayQueryParameters3D.create(chest, chest + forward * 0.9)
+	wall_query.exclude = [get_rid()]
+	var wall_hit := get_world_3d().direct_space_state.intersect_ray(wall_query)
+	if wall_hit.is_empty() or absf((wall_hit.normal as Vector3).y) > 0.25:
+		return false
+	var top_origin := (wall_hit.position as Vector3) + Vector3.UP * 2.0 + forward * 0.08
+	var top_query := PhysicsRayQueryParameters3D.create(top_origin, top_origin + Vector3.DOWN * 2.5)
+	top_query.exclude = [get_rid()]
+	var top_hit := get_world_3d().direct_space_state.intersect_ray(top_query)
+	if top_hit.is_empty():
+		return false
+	var top_y: float = (top_hit.position as Vector3).y
+	if top_y < global_position.y + 0.55 or top_y > global_position.y + 2.4:
+		return false
+	_ledge_hang_position = (wall_hit.position as Vector3) + (wall_hit.normal as Vector3) * 0.48 + Vector3.UP * (top_y - global_position.y - 1.15)
+	_ledge_hang_position.y = top_y - 1.05
+	_climb_normal = (wall_hit.normal as Vector3).normalized()
+	global_position = _ledge_hang_position
+	velocity = Vector3.ZERO
+	is_ledge_hanging = true
+	return true
+
+func _update_ledge_hang(_delta: float) -> void:
+	velocity = Vector3.ZERO
+	if input_move.y < -0.45:
+		var landing := _ledge_hang_position - _climb_normal * 0.9 + Vector3.UP * 1.05
+		var query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.0, landing + Vector3.DOWN * 3.0)
+		query.exclude = [get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty():
+			var floor_y: float = (hit.position as Vector3).y
+			_vault_start = global_position
+			_vault_end = Vector3(landing.x, floor_y, landing.z)
+			_vault_elapsed = 0.0
+			_vault_duration = 0.48
+			_vault_height = 0.42
+			_traversal_kind = "ledge_mantle"
+			is_ledge_hanging = false
+			is_vaulting = true
+			return
+	if input_move.y > 0.65:
+		is_ledge_hanging = false
+		velocity = Vector3(0.0, -1.8, 0.0)
+
 func set_checkpoint(position: Vector3) -> void:
 	checkpoint_position = position
 
@@ -1445,6 +1598,10 @@ func resurrect() -> bool:
 	is_wall_hugging = false
 	is_cover_transferring = false
 	is_grappling = false
+	is_swimming = false
+	swim_vertical_input = 0.0
+	is_climbing = false
+	is_ledge_hanging = false
 	attack_timer = 0.0
 	attack_buffer_timer = 0.0
 	buffered_attack_kind = ""

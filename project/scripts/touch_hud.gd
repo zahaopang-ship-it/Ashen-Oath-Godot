@@ -87,9 +87,15 @@ func _build_ui() -> void:
 	_register_action("GRAPPLE", Vector2(-370, -330), "grapple", Color(0.12, 0.52, 0.62))
 	_register_action("REVIVE", Vector2(-95, -330), "revive", Color(0.62, 0.16, 0.30))
 	_register_action("AIR ATTACK", Vector2(-95, -250), "air_attack", Color(0.52, 0.32, 0.12))
+	_register_action("CLIMB WALL", Vector2(-195, -410), "climb_wall", Color(0.24, 0.38, 0.48))
+	_register_action("LEDGE", Vector2(-95, -410), "ledge", Color(0.38, 0.42, 0.28))
+	_register_action("SWIM UP", Vector2(-475, -410), "swim_up", Color(0.12, 0.42, 0.62))
+	_register_action("SWIM DOWN", Vector2(-585, -410), "swim_down", Color(0.12, 0.34, 0.52))
+	_register_action("SURFACE", Vector2(-195, -490), "swim_up", Color(0.12, 0.42, 0.52))
+	_register_action("DIVE", Vector2(-95, -490), "swim_down", Color(0.12, 0.30, 0.42))
 	var hint := Label.new()
 	hint.text = "C CROUCH  /  V VAULT  /  M CLIMB  /  H WALL-HUG  /  B COVER-TO-COVER"
-	hint.text = "G GRAPPLE  /  T AIR ATTACK  /  Y RESURRECT  /  R REVERSAL  /  U UPGRADE  /  1-4 TOOLS"
+	hint.text = "G GRAPPLE  /  N CLIMB WALL  /  , DROP  /  . LEDGE GRAB  /  SURFACE + DIVE"
 	hint.position = Vector2(28, 154)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -197,9 +203,18 @@ func _action_down(action: String) -> void:
 		"grapple": game.player.try_grapple()
 		"revive": game.player.resurrect()
 		"air_attack": game.player.aerial_grapple_attack()
+		"climb_wall":
+			if game.player.is_climbing: game.player.stop_vertical_climb()
+			else: game.player.try_vertical_climb()
+		"ledge": game.player.try_ledge_grab()
+		"swim_up": game.player.swim_vertical_input = 1.0
+		"swim_down": game.player.swim_vertical_input = -1.0
+		"swim_up": game.player.set_swim_vertical_input(1.0)
+		"swim_down": game.player.set_swim_vertical_input(-1.0)
 
 func _action_up(action: String) -> void:
 	match action:
+		"swim_up", "swim_down": game.player.set_swim_vertical_input(0.0)
 		"deflect": game.player.end_deflect()
 		"block": game.player.end_block()
 
@@ -219,7 +234,7 @@ func _process(_delta: float) -> void:
 	posture_bar.value = game.player.get_posture_ratio() * 100.0
 	enemy_vitality.value = game.enemy.get_vitality_ratio() * 100.0
 	enemy_posture.value = game.enemy.get_posture_ratio() * 100.0
-	var movement_label := "GRAPPLING" if game.player.is_grappling else ("COVER MOVE" if game.player.is_cover_transferring else ("SPRINT" if game.player.is_sprinting else "WALK"))
+	var movement_label := "SWIMMING" if game.player.is_swimming else ("LEDGE HANG" if game.player.is_ledge_hanging else ("CLIMBING" if game.player.is_climbing else ("GRAPPLING" if game.player.is_grappling else ("COVER MOVE" if game.player.is_cover_transferring else ("SPRINT" if game.player.is_sprinting else "WALK")))))
 	var execution_prompt := "  /  DEATHBLOW READY" if game.enemy.state == 4 and not game.enemy.is_dead else ""
 	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
 	var awareness_text: String = ["UNAWARE", "SUSPICIOUS", "SEARCHING", "ALERTED"][game.guard.awareness_state]
