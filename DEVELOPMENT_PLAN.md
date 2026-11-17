@@ -124,8 +124,8 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Keep APK/AAB in builds/ with versioned filenames and test notes.
 
 ## Current known limitations
-- Fighters are still procedural capsules and the arena is a greybox; no production character/environment assets or animation have been integrated.
-- Combat is still a prototype: hit volumes are deterministic local-space gameplay boxes rather than weapon-bone swept collision; combat SFX are synthesized placeholders; no authored animation clips, boss, or Android export yet.
+- Fighters are still procedural primitive rigs with simple procedural locomotion and the arena is a greybox; no production character/environment assets, foot IK, or authored skeletal animation clips have been integrated.
+- Combat is still a prototype: hit volumes are deterministic local-space gameplay boxes rather than weapon-bone swept collision; combat SFX are synthesized placeholders; Android export and device validation remain outstanding.
 - The Linux container has no graphical desktop or physical touchscreen; Android rendering, safe areas, and true simultaneous multitouch remain unverified.
 - GitHub repository: https://github.com/zahaopang-ship-it/Ashen-Oath-Godot (private), branch `main`. Push every stable checkpoint here; never use an unrelated repository.
 
@@ -204,3 +204,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added distinct procedural execution poses: attacker draw-back/strike/follow-through and victim fold/collapse. The boss only transitions to DEAD when the sequence timer completes.
 - Added regression checks for paired state entry, movement/attack lockout, mid-animation timing, delayed terminal death, and one-shot execution behavior.
 - This remains procedural transform animation on capsule/primitive characters; it is not yet authored skeletal animation or motion-captured cinematic choreography.
+
+## M3 — Procedural locomotion and footwork pass
+- Added independent left/right leg pivots and simple leg/foot meshes to the greybox fighter rig; the upper-body capsule was shortened to create clearer separation between torso and legs.
+- Added a continuous gait phase driven by planar movement speed, with alternating leg swings, a subtle vertical body bounce, and light torso/weapon sway. Sprinting increases cadence and body response.
+- Added a lower guarded dodge posture and kept leg locomotion subordinate to combat states, so windup/active/recovery, hitstun, posture break, death, and synchronized execution continue to own the pose.
+- Boss locomotion has a heavier cadence and a more forceful Phase II stride; its idle weapon/body stance is distinct from the player.
+- Added five regression assertions for gait phase, alternating legs, body bounce, attack-state suppression, and return to idle. Headless combat suite: 72/72; boss suite: 22/22; feedback integration: 3/3.
+- Limitation: this is still procedural animation on primitive meshes, without foot IK, root-motion clips, authored skeletal animation, or Android visual validation.

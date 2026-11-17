@@ -108,9 +108,9 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	var mesh := MeshInstance3D.new()
 	var capsule_mesh := CapsuleMesh.new()
 	capsule_mesh.radius = 0.42
-	capsule_mesh.height = 1.8
+	capsule_mesh.height = 1.48
 	mesh.mesh = capsule_mesh
-	mesh.position.y = 0.9
+	mesh.position.y = 1.02
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.16, 0.24, 0.31) if player_controlled else Color(0.20, 0.075, 0.065)
 	mat.roughness = 0.82
@@ -141,10 +141,38 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	blade_mat.metallic = 0.78
 	blade.material_override = blade_mat
 	weapon_pivot.add_child(blade)
-	body.set_animation_rig(upper_body, weapon_pivot)
+	var leg_material := StandardMaterial3D.new()
+	leg_material.albedo_color = Color(0.075, 0.09, 0.105) if player_controlled else Color(0.095, 0.065, 0.06)
+	leg_material.roughness = 0.9
+	var left_leg := _make_leg_pivot(body, "LeftLegPivot", -0.19, leg_material)
+	var right_leg := _make_leg_pivot(body, "RightLegPivot", 0.19, leg_material)
+	body.set_animation_rig(upper_body, weapon_pivot, left_leg, right_leg)
 	if not player_controlled:
 		_add_boss_armor(body, upper_body)
 	return body
+
+
+func _make_leg_pivot(parent: Node3D, label: String, x: float, material: Material) -> Node3D:
+	var pivot := Node3D.new()
+	pivot.name = label
+	pivot.position = Vector3(x, 0.78, 0.0)
+	parent.add_child(pivot)
+	var leg := MeshInstance3D.new()
+	var shape := CapsuleMesh.new()
+	shape.radius = 0.145
+	shape.height = 0.78
+	leg.mesh = shape
+	leg.position = Vector3(0.0, -0.34, 0.0)
+	leg.material_override = material
+	pivot.add_child(leg)
+	var foot := MeshInstance3D.new()
+	var foot_shape := BoxMesh.new()
+	foot_shape.size = Vector3(0.25, 0.13, 0.38)
+	foot.mesh = foot_shape
+	foot.position = Vector3(0.0, -0.68, -0.09)
+	foot.material_override = material
+	pivot.add_child(foot)
+	return pivot
 
 func _add_boss_armor(body: CharacterBody3D, upper_body: Node3D) -> void:
 	var armor := StandardMaterial3D.new()

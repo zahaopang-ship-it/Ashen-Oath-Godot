@@ -140,6 +140,30 @@ func _run() -> void:
 	animated.call("_update_combat_animation", 0.05)
 	_check(upper.rotation.x > 0.05, "death state drives a collapse pose")
 
+	var gait_fighter := _new_fighter("GaitFighter", Vector3.ZERO)
+	gait_fighter.is_player = true
+	var gait_upper := Node3D.new()
+	var gait_weapon := Node3D.new()
+	var left_leg := Node3D.new()
+	var right_leg := Node3D.new()
+	gait_fighter.add_child(gait_upper)
+	gait_upper.add_child(gait_weapon)
+	gait_fighter.add_child(left_leg)
+	gait_fighter.add_child(right_leg)
+	gait_fighter.set_animation_rig(gait_upper, gait_weapon, left_leg, right_leg)
+	gait_fighter.velocity = Vector3(0.0, 0.0, -5.0)
+	gait_fighter.call("_update_combat_animation", 0.12)
+	_check(gait_fighter._gait_phase > 0.0, "locomotion advances a continuous gait phase")
+	_check(not is_equal_approx(left_leg.rotation.x, right_leg.rotation.x), "walking drives alternating leg swings")
+	_check(gait_upper.position.y > 0.0, "walking adds a subtle body bounce")
+	gait_fighter.state = 1
+	gait_fighter.call("_update_combat_animation", 0.12)
+	_check(absf(left_leg.rotation.x) < 0.2 and absf(right_leg.rotation.x) < 0.2, "attack states suppress locomotion leg swings")
+	gait_fighter.state = 0
+	gait_fighter.velocity = Vector3.ZERO
+	gait_fighter.call("_update_combat_animation", 0.2)
+	_check(absf(left_leg.rotation.x) < 0.1 and absf(right_leg.rotation.x) < 0.1, "legs settle back to idle when movement stops")
+
 	var feedback_log: Array[String] = []
 	var feedback_receiver := _new_fighter("FeedbackReceiver", Vector3.ZERO)
 	var feedback_source := _new_fighter("FeedbackSource", Vector3(0, 0, -1))
@@ -222,7 +246,7 @@ func _run() -> void:
 	sprinter.call("_player_update", 0.016)
 	_check(sprinter.is_sprinting and sprinter.velocity.length() > sprinter.move_speed * 0.6 * 1.2, "keyboard sprint request works below full joystick deflection")
 
-	print("Combat tests: ", 67 - failures.size(), "/67 passed")
+	print("Combat tests: ", 72 - failures.size(), "/72 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:

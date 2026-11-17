@@ -39,7 +39,11 @@ var hit_flash_timer := 0.0
 var _body_material: StandardMaterial3D
 var _upper_body: Node3D
 var _weapon_pivot: Node3D
+var _left_leg_pivot: Node3D
+var _right_leg_pivot: Node3D
 var _combat_anim_time := 0.0
+var _gait_phase := 0.0
+var _locomotion_bob := 0.0
 var ai_timer := 0.8
 var gravity := 22.0
 var attack_kind := "slash"
@@ -172,9 +176,11 @@ func set_body_material(material: StandardMaterial3D) -> void:
 	if _body_material:
 		_body_material.set_meta("base_color", _body_material.albedo_color)
 
-func set_animation_rig(upper_body: Node3D, weapon_pivot: Node3D) -> void:
+func set_animation_rig(upper_body: Node3D, weapon_pivot: Node3D, left_leg: Node3D = null, right_leg: Node3D = null) -> void:
 	_upper_body = upper_body
 	_weapon_pivot = weapon_pivot
+	_left_leg_pivot = left_leg
+	_right_leg_pivot = right_leg
 
 func _update_combat_animation(delta: float) -> void:
 	_combat_anim_time += delta
@@ -183,7 +189,38 @@ func _update_combat_animation(delta: float) -> void:
 	var body_pose := Vector3(0.0, 0.0, 0.0)
 	var weapon_pose := Vector3(0.0, 0.0, -0.18)
 	var body_offset := Vector3.ZERO
+	var left_leg_pose := 0.0
+	var right_leg_pose := 0.0
+	var gait_blend := 0.0
 	var weight := 1.0 - exp(-18.0 * delta)
+	var planar_speed := Vector2(velocity.x, velocity.z).length()
+	var speed_ratio := clampf(planar_speed / maxf(0.1, move_speed * 1.42), 0.0, 1.0)
+	var locomotion_active := planar_speed > 0.22 and state == CombatState.FREE and not is_blocking
+	if locomotion_active:
+		var gait_rate := lerpf(5.8, 10.5, speed_ratio)
+		if is_sprinting:
+			gait_rate *= 1.12
+		var gait_style := 1.0
+		if not is_player:
+			gait_rate *= 0.92
+			gait_style = 0.88
+			if has_method("get_phase_pattern") and int(get("boss_phase")) == 2:
+				gait_style = 1.12
+		_gait_phase = fposmod(_gait_phase + delta * gait_rate, TAU)
+		gait_blend = clampf(planar_speed / maxf(0.1, move_speed * 0.32), 0.0, 1.0)
+		var stride := sin(_gait_phase) * 0.48 * gait_blend * gait_style
+		left_leg_pose = stride
+		right_leg_pose = -stride
+		var bob_rate := 2.0 if is_sprinting else 1.0
+		_locomotion_bob = absf(cos(_gait_phase)) * 0.045 * gait_blend * bob_rate
+	else:
+		_locomotion_bob = lerpf(_locomotion_bob, 0.0, weight)
+		left_leg_pose = 0.0
+		right_leg_pose = 0.0
+	if is_instance_valid(_left_leg_pivot):
+		_left_leg_pivot.rotation.x = lerpf(_left_leg_pivot.rotation.x, left_leg_pose, 1.0 - exp(-14.0 * delta))
+	if is_instance_valid(_right_leg_pivot):
+		_right_leg_pivot.rotation.x = lerpf(_right_leg_pivot.rotation.x, right_leg_pose, 1.0 - exp(-14.0 * delta))
 	if state == CombatState.WINDUP:
 		var duration: float = float(ATTACK_WINDUP.get(attack_kind, WINDUP_TIME))
 		var progress := 1.0 - clampf(attack_timer / duration, 0.0, 1.0)
@@ -260,6 +297,8 @@ func _update_combat_animation(delta: float) -> void:
 		weapon_pose = Vector3(-0.42, 0.0, -0.32)
 	elif is_dodging:
 		body_pose = Vector3(0.25, 0.0, 0.0)
+		body_offset = Vector3(0.0, -0.13, 0.0)
+		weapon_pose = Vector3(0.25, 0.0, -0.24)
 	elif is_mikiri_countering:
 		body_pose = Vector3(-0.16, 0.0, 0.0)
 		weapon_pose = Vector3(-0.28, 0.0, -0.5)
@@ -267,10 +306,16 @@ func _update_combat_animation(delta: float) -> void:
 		body_pose = Vector3(0.35, 0.0, 0.0)
 		weapon_pose = Vector3(-0.35, 0.0, -0.2)
 	else:
-		body_pose = Vector3(0.025 * sin(_combat_anim_time * 2.4), 0.0, 0.025 * sin(_combat_anim_time * 1.7))
-		weapon_pose = Vector3(0.0, 0.0, -0.18 + 0.035 * sin(_combat_anim_time * 2.0))
+		var idle_breath := sin(_combat_anim_time * 2.4)
+		var walk_sway := sin(_gait_phase) * gait_blend
+		body_pose = Vector3(0.025 * idle_breath + walk_sway * 0.035, 0.0, 0.025 * sin(_combat_anim_time * 1.7) + gait_blend * (0.035 if is_sprinting else 0.015))
+		body_offset = Vector3(0.0, _locomotion_bob, 0.0)
+		weapon_pose = Vector3(0.0, 0.0, -0.18 + 0.035 * sin(_combat_anim_time * 2.0) + walk_sway * 0.045)
+		if not is_player:
+			weapon_pose.x -= 0.10
+			body_pose.z += 0.025
 	_upper_body.rotation = _upper_body.rotation.lerp(body_pose, weight)
-	_upper_body.position = _upper_body.position.lerp(Vector3(0.0, 0.0, 0.0) + body_offset, weight)
+	_upper_body.position = _upper_body.position.lerp(body_offset, weight)
 	_weapon_pivot.rotation = _weapon_pivot.rotation.lerp(weapon_pose, weight)
 
 func _begin_hit_reaction(attacker: Node3D) -> void:
