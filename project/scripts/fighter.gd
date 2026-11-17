@@ -515,8 +515,15 @@ func _player_update(delta: float) -> void:
 		wall_query.exclude = [get_rid()]
 		var wall_hit := get_world_3d().direct_space_state.intersect_ray(wall_query)
 		if wall_hit.is_empty():
-			is_wall_hugging = false
-			_wall_hug_normal = Vector3.ZERO
+			var old_tangent := Vector3.UP.cross(_wall_hug_normal).normalized()
+			var side_input := signf(input_move.x)
+			if not is_zero_approx(side_input) and _try_wall_corner_transition(old_tangent * side_input):
+				wall_query = PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.0, global_position + Vector3.UP * 1.0 - _wall_hug_normal * 0.95)
+				wall_query.exclude = [get_rid()]
+				wall_hit = get_world_3d().direct_space_state.intersect_ray(wall_query)
+			if wall_hit.is_empty():
+				is_wall_hugging = false
+				_wall_hug_normal = Vector3.ZERO
 		else:
 			_wall_hug_normal = (wall_hit.normal as Vector3).normalized()
 			var tangent := Vector3.UP.cross(_wall_hug_normal).normalized()
@@ -635,6 +642,26 @@ func _patrol_update(delta: float) -> void:
 	velocity.x = direction.x * patrol_speed
 	velocity.z = direction.z * patrol_speed
 	_face_direction(direction, delta, 4.0)
+
+func _try_wall_corner_transition(tangent_direction: Vector3) -> bool:
+	if tangent_direction.length_squared() < 0.5 or _wall_hug_normal.length_squared() < 0.5:
+		return false
+	var direction := tangent_direction.normalized()
+	var probe_origin := global_position + direction * 0.82 + Vector3.UP * 1.0
+	var query := PhysicsRayQueryParameters3D.create(probe_origin, probe_origin - direction * 1.25)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return false
+	var next_normal: Vector3 = hit.normal
+	next_normal.y = 0.0
+	if next_normal.length_squared() < 0.5:
+		return false
+	next_normal = next_normal.normalized()
+	if absf(next_normal.dot(_wall_hug_normal)) > 0.78:
+		return false
+	_wall_hug_normal = next_normal
+	return true
 
 func toggle_wall_hug() -> bool:
 	if not is_player or is_dead or is_vaulting or state != CombatState.FREE:

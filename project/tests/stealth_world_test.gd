@@ -101,8 +101,21 @@ func _run() -> void:
 		await physics_frame
 	_check(absf(player.global_position.x - hug_start.x) > 0.08, "wall-hug allows lateral movement along the wall")
 	_check(player.toggle_wall_hug() and not player.is_wall_hugging, "wall-hug can be exited on demand")
+	var corner_wall := StaticBody3D.new()
+	corner_wall.position = player.global_position + Vector3(0.5, 0.0, 0.0)
+	game.add_child(corner_wall)
+	var corner_shape := CollisionShape3D.new()
+	var corner_box := BoxShape3D.new()
+	corner_box.size = Vector3(0.2, 2.2, 2.4)
+	corner_shape.shape = corner_box
+	corner_shape.position.y = 1.1
+	corner_wall.add_child(corner_shape)
+	await physics_frame
+	player._wall_hug_normal = Vector3(0.0, 0.0, 1.0)
+	_check(player._try_wall_corner_transition(Vector3.RIGHT), "wall-hug detects an adjacent perpendicular wall at a corner")
+	_check(absf(player._wall_hug_normal.x) > 0.9, "wall-hug updates its normal to follow the new wall plane")
 	if failures.is_empty():
-		print("Stealth world tests: 18/18 passed")
+		print("Stealth world tests: 20/20 passed")
 	else:
-		printerr("Stealth world tests: ", 18 - failures.size(), "/18 passed")
+		printerr("Stealth world tests: ", 20 - failures.size(), "/20 passed")
 	quit(0 if failures.is_empty() else 1)
