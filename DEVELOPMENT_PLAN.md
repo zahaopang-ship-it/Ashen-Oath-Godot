@@ -334,3 +334,12 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Guard awareness continues updating while investigating cover points. If inspection restores direct vision of an exposed player, normal suspicion escalation can transition the guard back to ALERTED; hidden position is not read from the player's location to create search waypoints.
 - Regression coverage includes crouch requirement, valid cover destination, collision-safe physical movement, arrival inside concealment, visible-player rediscovery, and wall-hug torso/arm pose.
 - Limitation: cover transfer uses local collision probes and one detour, not a global navigation mesh; it may cancel around complex obstacles. Wall pose is procedural, not authored animation. Android device validation remains pending.
+
+
+## M14 — Prosthetic tool combat prototype
+- Added four player prosthetic actions on keyboard 1–4 and touchscreen: Shuriken, Firecracker, Axe, and Umbrella. Tool use is restricted to neutral combat state and uses a shared 100-point spirit-emblem pool with per-tool costs, cooldowns, and gradual regeneration (5.5/sec).
+- Shuriken checks a 10 m forward arc and clear ray, deals light vitality/posture damage, and displays a short emissive projectile traveling to the target. Failed targeting does not consume energy.
+- Firecracker creates a short-lived emissive burst, interrupts nearby free guards, and redirects their investigation route to the burst location rather than the player's current position.
+- Axe applies a close-range heavy impact with strong posture pressure and a dedicated procedural swing pose. Umbrella creates a 1.25-second timed guard window, including a broader defensive pose, then closes automatically.
+- Added spirit-energy HUD bar and regression tests for targeting, damage, distraction, guard interruption, timed defense, energy costs, and invalid tool use.
+- Limitation: these are prototype gameplay implementations and primitive VFX, not final Sekiro-grade authored animations, models, or sound design. Umbrella currently uses the existing guard/block damage rules; lightning reversal and prosthetic upgrades are not implemented. Android touch/performance validation remains pending.

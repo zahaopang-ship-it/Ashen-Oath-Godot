@@ -12,6 +12,7 @@ var posture_bar: ProgressBar
 var enemy_vitality: ProgressBar
 var enemy_posture: ProgressBar
 var suspicion_bar: ProgressBar
+var prosthetic_bar: ProgressBar
 var status_label: Label
 var action_rects: Dictionary = {}
 
@@ -35,13 +36,15 @@ func _build_ui() -> void:
 	enemy_posture = _make_bar(root, Vector2(500, 55), Vector2(280, 9), Color(0.83, 0.61, 0.18))
 	suspicion_bar = _make_bar(root, Vector2(28, 101), Vector2(250, 8), Color(0.88, 0.48, 0.12))
 	suspicion_bar.max_value = 1.15
+	prosthetic_bar = _make_bar(root, Vector2(28, 140), Vector2(250, 8), Color(0.22, 0.62, 0.72))
+	prosthetic_bar.max_value = 100.0
 	var enemy_label := Label.new()
 	enemy_label.text = "ASHEN WARLORD  /  BOSS"
 	enemy_label.position = Vector2(500, 10)
 	enemy_label.add_theme_font_size_override("font_size", 15)
 	root.add_child(enemy_label)
 	status_label = Label.new()
-	status_label.position = Vector2(28, 105)
+	status_label.position = Vector2(28, 119)
 	status_label.add_theme_font_size_override("font_size", 14)
 	status_label.add_theme_color_override("font_color", Color(0.95, 0.82, 0.48))
 	root.add_child(status_label)
@@ -71,13 +74,18 @@ func _build_ui() -> void:
 	_register_action("STOMP", Vector2(-370, -145), "stomp", Color(0.52, 0.30, 0.12))
 	_register_action("DEATHBLOW", Vector2(-370, -70), "deathblow", Color(0.72, 0.08, 0.08))
 	_register_action("CROUCH", Vector2(-370, -250), "crouch", Color(0.25, 0.34, 0.39))
-	_register_action("VAULT", Vector2(-475, -250), "vault", Color(0.34, 0.39, 0.28))
-	_register_action("CLIMB", Vector2(-475, -170), "climb", Color(0.28, 0.39, 0.52))
-	_register_action("WALL", Vector2(-475, -90), "wall", Color(0.34, 0.32, 0.48))
-	_register_action("COVER", Vector2(-475, -10), "cover", Color(0.20, 0.38, 0.28))
+	_register_action("VAULT", Vector2(-475, -330), "vault", Color(0.34, 0.39, 0.28))
+	_register_action("CLIMB", Vector2(-475, -250), "climb", Color(0.28, 0.39, 0.52))
+	_register_action("WALL", Vector2(-475, -170), "wall", Color(0.34, 0.32, 0.48))
+	_register_action("COVER", Vector2(-475, -90), "cover", Color(0.20, 0.38, 0.28))
+	_register_action("SHURIKEN", Vector2(-585, -330), "shuriken", Color(0.30, 0.38, 0.52))
+	_register_action("FIRECRACKER", Vector2(-585, -250), "firecracker", Color(0.68, 0.38, 0.12))
+	_register_action("AXE", Vector2(-585, -170), "axe", Color(0.48, 0.30, 0.20))
+	_register_action("UMBRELLA", Vector2(-585, -90), "umbrella", Color(0.24, 0.42, 0.48))
 	var hint := Label.new()
 	hint.text = "C CROUCH  /  V VAULT  /  M CLIMB  /  H WALL-HUG  /  B COVER-TO-COVER"
-	hint.position = Vector2(28, 132)
+	hint.text = "1 SHURIKEN  /  2 FIRECRACKER  /  3 AXE  /  4 UMBRELLA  /  B COVER"
+	hint.position = Vector2(28, 154)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
 	root.add_child(hint)
@@ -175,6 +183,10 @@ func _action_down(action: String) -> void:
 		"climb": game.player.try_mantle()
 		"wall": game.player.toggle_wall_hug()
 		"cover": game.player.begin_cover_transfer()
+		"shuriken": game.player.use_prosthetic("shuriken")
+		"firecracker": game.player.use_prosthetic("firecracker")
+		"axe": game.player.use_prosthetic("axe")
+		"umbrella": game.player.use_prosthetic("umbrella")
 
 func _action_up(action: String) -> void:
 	match action:
@@ -202,8 +214,9 @@ func _process(_delta: float) -> void:
 	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
 	var awareness_text: String = ["UNAWARE", "SUSPICIOUS", "SEARCHING", "ALERTED"][game.guard.awareness_state]
 	suspicion_bar.value = game.guard.suspicion
+	prosthetic_bar.value = game.player.prosthetic_energy
 	var stealth_label := " / COVERED" if game.player.is_in_cover and game.player.is_crouching else (" / IN COVER" if game.player.is_in_cover else "")
-	status_label.text = "PLAYER: " + _state_name(game.player) + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + stealth_label + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
+	status_label.text = "SPIRIT EMBLEMS: " + str(roundi(game.player.prosthetic_energy)) + " / 100  |  PLAYER: " + _state_name(game.player) + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + stealth_label + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
 
 func _state_name(fighter: Node) -> String:
 	if fighter.state == 4: return "POSTURE BROKEN"

@@ -495,6 +495,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_M: player.try_mantle()
 			KEY_H: player.toggle_wall_hug()
 			KEY_B: player.begin_cover_transfer()
+			KEY_1: player.use_prosthetic("shuriken")
+			KEY_2: player.use_prosthetic("firecracker")
+			KEY_3: player.use_prosthetic("axe")
+			KEY_4: player.use_prosthetic("umbrella")
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:
