@@ -3,6 +3,7 @@ extends CharacterBody3D
 const NAVIGATION_STEERING = preload("res://scripts/ai/sentinel_navigation_steering.gd")
 const STEALTH_AWARENESS = preload("res://scripts/ai/stealth_awareness_controller.gd")
 const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
+const TRAVERSAL_CONTROLLER = preload("res://scripts/traversal/fighter_traversal_controller.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -1302,131 +1303,36 @@ func _die() -> void:
 	died.emit()
 
 func set_swim_vertical_input(value: float) -> void:
-	swim_vertical_input = clampf(value, -1.0, 1.0) if is_swimming else 0.0
+	TRAVERSAL_CONTROLLER.set_swim_vertical_input(self, value)
+
 
 func enter_water(surface_y: float) -> void:
-	if not is_player or is_dead:
-		return
-	is_swimming = true
-	swim_vertical_input = 0.0
-	_water_surface_y = surface_y
-	is_crouching = false
-	is_sprinting = false
-	sprint_requested = false
-	if is_instance_valid(body_collision) and body_collision.shape is CapsuleShape3D:
-		body_collision.shape.height = 1.25
-		body_collision.position.y = 0.68
+	TRAVERSAL_CONTROLLER.enter_water(self, surface_y)
+
 
 func exit_water() -> void:
-	if not is_swimming:
-		return
-	is_swimming = false
-	swim_vertical_input = 0.0
-	velocity.y = maxf(velocity.y, 1.0)
-	if is_instance_valid(body_collision) and body_collision.shape is CapsuleShape3D:
-		body_collision.shape.height = 1.8
-		body_collision.position.y = 0.9
+	TRAVERSAL_CONTROLLER.exit_water(self)
+
 
 func try_vertical_climb() -> bool:
-	if is_climbing:
-		stop_vertical_climb()
-		return true
-	if not is_player or is_dead or state != CombatState.FREE or is_swimming or is_grappling or is_vaulting or is_wall_hugging:
-		return false
-	var forward := -global_transform.basis.z.normalized()
-	var origin := global_position + Vector3.UP * 0.95
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + forward * 0.9)
-	query.exclude = [get_rid()]
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit.is_empty() or absf((hit.normal as Vector3).y) > 0.25:
-		return false
-	var climb_collider: Object = hit.get("collider")
-	if not is_instance_valid(climb_collider) or not climb_collider.is_in_group("climbable_surfaces"):
-		return false
-	_climb_normal = (hit.normal as Vector3).normalized()
-	is_climbing = true
-	is_crouching = false
-	is_sprinting = false
-	velocity = Vector3.ZERO
-	return true
+	return TRAVERSAL_CONTROLLER.try_vertical_climb(self)
+
 
 func stop_vertical_climb() -> void:
-	if not is_climbing:
-		return
-	is_climbing = false
-	_climb_normal = Vector3.ZERO
-	velocity = Vector3(0.0, -1.2, 0.0)
+	TRAVERSAL_CONTROLLER.stop_vertical_climb(self)
+
 
 func _update_vertical_climb(delta: float) -> void:
-	if _climb_normal.length_squared() < 0.5:
-		stop_vertical_climb()
-		return
-	var origin := global_position + Vector3.UP * 0.95
-	var query := PhysicsRayQueryParameters3D.create(origin, origin - _climb_normal * 1.05)
-	query.exclude = [get_rid()]
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit.is_empty():
-		stop_vertical_climb()
-		return
-	var vertical := -input_move.y
-	velocity = Vector3.UP * vertical * climb_speed - _climb_normal * 0.35
-	move_and_slide()
-	if vertical > 0.0:
-		var top_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.9 + _climb_normal * 0.2, global_position + Vector3.UP * 1.9 - _climb_normal * 0.85)
-		top_query.exclude = [get_rid()]
-		if get_world_3d().direct_space_state.intersect_ray(top_query).is_empty():
-			stop_vertical_climb()
+	TRAVERSAL_CONTROLLER.update_vertical_climb(self, delta)
+
 
 func try_ledge_grab() -> bool:
-	if not is_player or is_dead or is_on_floor() or is_swimming or is_grappling or is_climbing or is_ledge_hanging or state != CombatState.FREE:
-		return false
-	if velocity.y > 1.5 or velocity.y < -8.5:
-		return false
-	var forward := -global_transform.basis.z.normalized()
-	var chest := global_position + Vector3.UP * 1.35
-	var wall_query := PhysicsRayQueryParameters3D.create(chest, chest + forward * 0.9)
-	wall_query.exclude = [get_rid()]
-	var wall_hit := get_world_3d().direct_space_state.intersect_ray(wall_query)
-	if wall_hit.is_empty() or absf((wall_hit.normal as Vector3).y) > 0.25:
-		return false
-	var top_origin := (wall_hit.position as Vector3) + Vector3.UP * 2.0 + forward * 0.08
-	var top_query := PhysicsRayQueryParameters3D.create(top_origin, top_origin + Vector3.DOWN * 2.5)
-	top_query.exclude = [get_rid()]
-	var top_hit := get_world_3d().direct_space_state.intersect_ray(top_query)
-	if top_hit.is_empty():
-		return false
-	var top_y: float = (top_hit.position as Vector3).y
-	if top_y < global_position.y + 0.55 or top_y > global_position.y + 2.4:
-		return false
-	_ledge_hang_position = (wall_hit.position as Vector3) + (wall_hit.normal as Vector3) * 0.48 + Vector3.UP * (top_y - global_position.y - 1.15)
-	_ledge_hang_position.y = top_y - 1.05
-	_climb_normal = (wall_hit.normal as Vector3).normalized()
-	global_position = _ledge_hang_position
-	velocity = Vector3.ZERO
-	is_ledge_hanging = true
-	return true
+	return TRAVERSAL_CONTROLLER.try_ledge_grab(self)
 
-func _update_ledge_hang(_delta: float) -> void:
-	velocity = Vector3.ZERO
-	if input_move.y < -0.45:
-		var landing := _ledge_hang_position + _climb_normal * 0.9 + Vector3.UP * 1.05
-		var query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.0, landing + Vector3.DOWN * 3.0)
-		query.exclude = [get_rid()]
-		var hit := get_world_3d().direct_space_state.intersect_ray(query)
-		if not hit.is_empty():
-			var floor_y: float = (hit.position as Vector3).y
-			_vault_start = global_position
-			_vault_end = Vector3(landing.x, floor_y, landing.z)
-			_vault_elapsed = 0.0
-			_vault_duration = 0.48
-			_vault_height = 0.42
-			_traversal_kind = "ledge_mantle"
-			is_ledge_hanging = false
-			is_vaulting = true
-			return
-	if input_move.y > 0.65:
-		is_ledge_hanging = false
-		velocity = Vector3(0.0, -1.8, 0.0)
+
+func _update_ledge_hang(delta: float) -> void:
+	TRAVERSAL_CONTROLLER.update_ledge_hang(self, delta)
+
 
 func set_checkpoint(position: Vector3) -> void:
 	checkpoint_position = position
@@ -1531,81 +1437,20 @@ func resurrect() -> bool:
 	return true
 
 func begin_jump() -> bool:
-	if not is_player or is_dead or state != CombatState.FREE or not is_on_floor() or is_grappling or is_vaulting:
-		return false
-	velocity.y = 7.2
-	is_crouching = false
-	return true
+	return TRAVERSAL_CONTROLLER.begin_jump(self)
+
 
 func try_grapple() -> bool:
-	if not is_player or is_dead or state != CombatState.FREE or is_grappling or is_vaulting or is_wall_hugging or is_cover_transferring:
-		return false
-	var best: Node3D = null
-	var best_distance := 12.5
-	var forward := -global_transform.basis.z.normalized()
-	for candidate in get_tree().get_nodes_in_group("grapple_points"):
-		if not candidate is Node3D or not is_instance_valid(candidate):
-			continue
-		var offset: Vector3 = candidate.global_position - global_position
-		var distance := offset.length()
-		if distance < 2.0 or distance > best_distance:
-			continue
-		var direction := offset.normalized()
-		if forward.dot(direction) < 0.48:
-			continue
-		var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.1, candidate.global_position)
-		query.exclude = [get_rid()]
-		var hit := get_world_3d().direct_space_state.intersect_ray(query)
-		if not hit.is_empty() and hit.collider != candidate:
-			continue
-		best = candidate
-		best_distance = distance
-	if not is_instance_valid(best):
-		return false
-	grapple_target = best
-	_grapple_start = global_position
-	_grapple_end = best.global_position + Vector3(0.0, -0.8, 0.0)
-	_grapple_elapsed = 0.0
-	_grapple_duration = clampf(best_distance / 18.0, 0.32, 0.62)
-	_grapple_height = clampf(best_distance * 0.16, 0.8, 1.8)
-	is_grappling = true
-	_grapple_attack_ready = true
-	velocity = Vector3.ZERO
-	return true
+	return TRAVERSAL_CONTROLLER.try_grapple(self)
+
 
 func _update_grapple(delta: float) -> void:
-	if not is_instance_valid(grapple_target):
-		is_grappling = false
-		return
-	_grapple_elapsed += delta
-	var t := clampf(_grapple_elapsed / _grapple_duration, 0.0, 1.0)
-	var desired := _grapple_start.lerp(_grapple_end, t) + Vector3.UP * (sin(t * PI) * _grapple_height)
-	var travel := desired - global_position
-	velocity = travel / maxf(delta, 0.001)
-	move_and_slide()
-	if get_slide_collision_count() > 0 and t < 0.92:
-		is_grappling = false
-		grapple_target = null
-		velocity = Vector3.ZERO
-		return
-	if t >= 1.0:
-		is_grappling = false
-		grapple_target = null
-		velocity = Vector3.ZERO
-		_grapple_attack_ready = true
+	TRAVERSAL_CONTROLLER.update_grapple(self, delta)
+
 
 func aerial_grapple_attack() -> bool:
-	if not is_player or is_dead or state != CombatState.FREE or is_grappling or not _grapple_attack_ready or not is_instance_valid(target) or target.is_dead:
-		return false
-	var offset := target.global_position - global_position
-	offset.y = 0.0
-	if offset.length() > 3.1 or offset.length() < 0.1:
-		return false
-	if (-global_transform.basis.z).dot(offset.normalized()) < 0.0:
-		return false
-	_grapple_attack_ready = false
-	start_attack("heavy")
-	return true
+	return TRAVERSAL_CONTROLLER.aerial_grapple_attack(self)
+
 
 func begin_mikiri_counter() -> bool:
 	if is_dead or state != CombatState.FREE:
