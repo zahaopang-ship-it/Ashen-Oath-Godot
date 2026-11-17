@@ -282,3 +282,13 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - The arena directional light already casts real-time shadows; foliage and crates use the normal shadow-casting geometry. Detection currently uses physical cover occlusion and authored concealment zones rather than sampling rendered shadow pixels.
 - Headless validation: combat 104/104, boss 22/22, feedback 5/5, stealth world 5/5; editor import and main-scene smoke passed.
 - Limitation: no dynamic lighting-based stealth meter, foliage wind, or Android visual/touch validation yet.
+
+
+## M8 — Low-obstacle vault traversal
+- Added context-sensitive vault detection using low and high forward raycasts plus a landing-ground raycast.
+- Player can vault over low obstacles with a short eased arc; tall walls and missing landing ground are rejected.
+- Added keyboard V and touchscreen VAULT action. Traversal temporarily locks normal movement and combat input until landing.
+- Added regression checks for successful low obstacle vault start and rejection of a tall wall.
+- Added a compact airborne vault pose with tucked legs and raised arms.
+- Headless validation: combat 104/104, boss 22/22, feedback 5/5, stealth/traversal world 10/10; editor import and main-scene smoke passed.
+- Limitation: this is a prototype traversal arc, not a hand-authored climbing animation or ledge-grab system.

@@ -72,6 +72,12 @@ var stealth_deathblow_started := false
 var is_crouching := false
 var is_in_cover := false
 var stealth_cover_count := 0
+var is_vaulting := false
+var _vault_elapsed := 0.0
+var _vault_duration := 0.42
+var _vault_start := Vector3.ZERO
+var _vault_end := Vector3.ZERO
+var _vault_height := 0.82
 var body_collision: CollisionShape3D
 var patrol_points: Array[Vector3] = []
 var patrol_index := 0
@@ -118,6 +124,10 @@ const ATTACK_BUFFER_WINDOW := 0.58
 const COMBO_RESET_TIME := 0.95
 
 func _physics_process(delta: float) -> void:
+	if is_vaulting:
+		_update_vault(delta)
+		_update_combat_animation(delta)
+		return
 	if is_dead:
 		_update_combat_animation(delta)
 		velocity = Vector3.ZERO
@@ -428,6 +438,16 @@ func _update_combat_animation(delta: float) -> void:
 		left_arm_pose.z += 0.08
 		right_arm_pose.z -= 0.08
 		weapon_pose.x += 0.12
+	if is_vaulting:
+		var vault_progress := clampf(_vault_elapsed / maxf(0.01, _vault_duration), 0.0, 1.0)
+		var tuck := sin(vault_progress * PI)
+		body_pose = Vector3(-0.28, 0.0, 0.0)
+		body_offset.y += 0.08 + tuck * 0.06
+		left_leg_pose = -0.72 * tuck
+		right_leg_pose = -0.62 * tuck
+		left_arm_pose = Vector3(-0.48, 0.0, 0.42)
+		right_arm_pose = Vector3(-0.42, 0.0, -0.38)
+		weapon_pose = Vector3(0.36, 0.0, -0.22)
 	var parry_blend := clampf(_parry_pose_timer / 0.22, 0.0, 1.0)
 	var recoil_blend := clampf(_deflect_recoil_timer / 0.20, 0.0, 1.0)
 	# A successful deflect snaps the defender's blade into the contact line.
@@ -477,6 +497,8 @@ func _begin_hit_reaction(attacker: Node3D, incoming_kind: String = "slash") -> v
 			velocity.z = away.z * knockback
 
 func _player_update(delta: float) -> void:
+	if is_vaulting:
+		return
 	if state != CombatState.FREE:
 		velocity.x = move_toward(velocity.x, 0.0, movement_braking * delta)
 		velocity.z = move_toward(velocity.z, 0.0, movement_braking * delta)
@@ -581,6 +603,53 @@ func _patrol_update(delta: float) -> void:
 	velocity.x = direction.x * patrol_speed
 	velocity.z = direction.z * patrol_speed
 	_face_direction(direction, delta, 4.0)
+
+func try_vault() -> bool:
+	if not is_player or is_dead or is_vaulting or state != CombatState.FREE or not is_on_floor():
+		return false
+	var forward := -global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	if forward.length_squared() < 0.5:
+		return false
+	var space := get_world_3d().direct_space_state
+	var low_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 0.58, global_position + Vector3.UP * 0.58 + forward * 1.25)
+	low_query.exclude = [get_rid()]
+	var low_hit := space.intersect_ray(low_query)
+	if low_hit.is_empty():
+		return false
+	var high_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.48, global_position + Vector3.UP * 1.48 + forward * 1.15)
+	high_query.exclude = [get_rid()]
+	if not space.intersect_ray(high_query).is_empty():
+		return false
+	var landing := global_position + forward * 1.9
+	var floor_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.0, landing + Vector3.DOWN * 2.0)
+	floor_query.exclude = [get_rid()]
+	var floor_hit := space.intersect_ray(floor_query)
+	if floor_hit.is_empty():
+		return false
+	landing.y = (floor_hit.position as Vector3).y
+	_vault_start = global_position
+	_vault_end = landing
+	_vault_elapsed = 0.0
+	_vault_duration = 0.42
+	_vault_height = 0.82
+	is_vaulting = true
+	is_crouching = false
+	is_sprinting = false
+	sprint_requested = false
+	velocity = Vector3.ZERO
+	return true
+
+func _update_vault(delta: float) -> void:
+	_vault_elapsed = minf(_vault_duration, _vault_elapsed + delta)
+	var t := _vault_elapsed / _vault_duration
+	var eased := t * t * (3.0 - 2.0 * t)
+	global_position = _vault_start.lerp(_vault_end, eased) + Vector3.UP * (sin(t * PI) * _vault_height)
+	if t >= 1.0:
+		global_position = _vault_end
+		is_vaulting = false
+		velocity = Vector3.ZERO
 
 func set_crouching(enabled: bool) -> void:
 	if not is_player or is_dead or state != CombatState.FREE:

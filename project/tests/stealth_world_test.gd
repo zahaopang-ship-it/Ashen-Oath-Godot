@@ -36,8 +36,40 @@ func _run() -> void:
 	await physics_frame
 	await physics_frame
 	_check(not player.is_in_cover, "leaving cover zone restores normal visibility")
+	player.global_position = Vector3(0.0, 0.0, 4.0)
+	player.rotation.y = 0.0
+	await physics_frame
+	await physics_frame
+	var obstacle := StaticBody3D.new()
+	obstacle.position = Vector3(0.0, 0.0, 2.8)
+	game.add_child(obstacle)
+	var obstacle_shape := CollisionShape3D.new()
+	var obstacle_box := BoxShape3D.new()
+	obstacle_box.size = Vector3(1.2, 0.8, 0.4)
+	obstacle_shape.shape = obstacle_box
+	obstacle_shape.position.y = 0.4
+	obstacle.add_child(obstacle_shape)
+	await physics_frame
+	var start_z := player.global_position.z
+	_check(player.try_vault(), "player can vault a low obstacle in the live arena")
+	_check(player.is_vaulting, "vault enters a dedicated traversal state")
+	for i in range(30):
+		await physics_frame
+	_check(not player.is_vaulting and player.global_position.z < start_z - 1.4, "vault completes beyond the obstacle")
+	var tall_wall := StaticBody3D.new()
+	tall_wall.position = player.global_position + Vector3(0.0, 0.0, -1.2)
+	game.add_child(tall_wall)
+	var wall_shape := CollisionShape3D.new()
+	var wall_box := BoxShape3D.new()
+	wall_box.size = Vector3(1.2, 2.0, 0.4)
+	wall_shape.shape = wall_box
+	wall_shape.position.y = 1.0
+	tall_wall.add_child(wall_shape)
+	await physics_frame
+	_check(not player.try_vault(), "vault rejects a full-height wall")
+	_check(not player.is_vaulting, "rejected traversal leaves player in normal movement state")
 	if failures.is_empty():
-		print("Stealth world tests: 5/5 passed")
+		print("Stealth world tests: 10/10 passed")
 	else:
-		printerr("Stealth world tests: ", 5 - failures.size(), "/5 passed")
+		printerr("Stealth world tests: ", 10 - failures.size(), "/10 passed")
 	quit(0 if failures.is_empty() else 1)

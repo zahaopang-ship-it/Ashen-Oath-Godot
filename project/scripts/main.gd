@@ -491,6 +491,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if not player.stealth_deathblow_target():
 					player.deathblow_broken_target()
 			KEY_C: player.toggle_crouch()
+			KEY_V: player.try_vault()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:

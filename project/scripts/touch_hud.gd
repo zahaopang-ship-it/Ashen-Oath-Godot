@@ -71,8 +71,9 @@ func _build_ui() -> void:
 	_register_action("STOMP", Vector2(-370, -145), "stomp", Color(0.52, 0.30, 0.12))
 	_register_action("DEATHBLOW", Vector2(-370, -70), "deathblow", Color(0.72, 0.08, 0.08))
 	_register_action("CROUCH", Vector2(-370, -250), "crouch", Color(0.25, 0.34, 0.39))
+	_register_action("VAULT", Vector2(-475, -250), "vault", Color(0.34, 0.39, 0.28))
 	var hint := Label.new()
-	hint.text = "C CROUCH  /  Hide in bushes and crates  /  Stay low to avoid detection"
+	hint.text = "C CROUCH  /  V VAULT low obstacles  /  Hide in bushes and crates"
 	hint.position = Vector2(28, 132)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -167,6 +168,7 @@ func _action_down(action: String) -> void:
 			if not game.player.stealth_deathblow_target():
 				game.player.deathblow_broken_target()
 		"crouch": game.player.toggle_crouch()
+		"vault": game.player.try_vault()
 
 func _action_up(action: String) -> void:
 	match action:
