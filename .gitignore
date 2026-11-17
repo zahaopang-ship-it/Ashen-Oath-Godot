@@ -1,0 +1,5 @@
+tools/
+builds/
+*.apk
+*.aab
+*.log
