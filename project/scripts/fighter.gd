@@ -6,7 +6,7 @@ signal posture_broken
 signal died
 signal combat_feedback(kind: String, source: Node3D)
 
-enum CombatState { FREE, WINDUP, ACTIVE, RECOVERY, POSTURE_BROKEN, DEAD, HITSTUN }
+enum CombatState { FREE, WINDUP, ACTIVE, RECOVERY, POSTURE_BROKEN, DEAD, HITSTUN, EXECUTING }
 
 @export var is_player := false
 @export var display_name := "Fighter"
@@ -57,6 +57,8 @@ var is_sprinting := false
 var sprint_requested := false
 var posture_stomped := false
 var deathblow_executed := false
+var execution_timer := 0.0
+var execution_partner: Node3D
 
 const WINDUP_TIME := 0.32
 const ACTIVE_TIME := 0.10
@@ -80,6 +82,18 @@ const COMBO_RESET_TIME := 0.95
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
+		_update_combat_animation(delta)
+		velocity = Vector3.ZERO
+		return
+	if state == CombatState.EXECUTING:
+		execution_timer = maxf(0.0, execution_timer - delta)
+		if execution_timer <= 0.0:
+			if deathblow_executed:
+				vitality = 0.0
+				_die()
+			else:
+				state = CombatState.FREE
+			execution_partner = null
 		_update_combat_animation(delta)
 		velocity = Vector3.ZERO
 		return
@@ -225,6 +239,19 @@ func _update_combat_animation(delta: float) -> void:
 	elif state == CombatState.POSTURE_BROKEN:
 		body_pose = Vector3(0.62 + sin(_combat_anim_time * 13.0) * 0.06, 0.0, 0.0)
 		weapon_pose = Vector3(0.85, 0.0, 0.0)
+	elif state == CombatState.EXECUTING:
+		var execution_progress := 1.0 - clampf(execution_timer / 0.82, 0.0, 1.0)
+		if deathblow_executed:
+			# Victim folds forward, then drops as the execution completes.
+			var collapse := smoothstep(0.28, 1.0, execution_progress)
+			body_pose = Vector3(0.28 + collapse * 0.92, 0.0, 0.08)
+			weapon_pose = Vector3(0.35 + collapse * 0.48, 0.0, 0.12)
+			body_offset = Vector3(0.0, -0.10 * collapse, 0.10 * execution_progress)
+		else:
+			# Attacker draws back, drives in, and holds the finishing follow-through.
+			var strike := sin(clampf(execution_progress / 0.62, 0.0, 1.0) * PI)
+			body_pose = Vector3(-0.22 + strike * 0.38, 0.0, -0.10 + execution_progress * 0.20)
+			weapon_pose = Vector3(-0.95 + strike * 1.85, 0.0, -0.35 + execution_progress * 0.72)
 	elif state == CombatState.DEAD:
 		body_pose = Vector3(1.35, 0.0, 0.0)
 		weapon_pose = Vector3(0.4, 0.0, 0.0)
@@ -523,9 +550,16 @@ func receive_deathblow(attacker: Node3D) -> bool:
 	if offset.length() > 2.8 or offset.length_squared() < 0.001:
 		return false
 	deathblow_executed = true
-	vitality = 0.0
+	state = CombatState.EXECUTING
+	execution_timer = 0.82
+	execution_partner = attacker
+	velocity = Vector3.ZERO
+	if attacker is CharacterBody3D:
+		attacker.state = CombatState.EXECUTING
+		attacker.execution_timer = 0.82
+		attacker.execution_partner = self
+		attacker.velocity = Vector3.ZERO
 	combat_feedback.emit("deathblow", self)
-	_die()
 	return true
 
 func receive_stomp(attacker: Node3D) -> bool:

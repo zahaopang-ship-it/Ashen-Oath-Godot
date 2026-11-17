@@ -69,8 +69,17 @@ func _run() -> void:
 	execution_boss.state = 4
 	execution_boss.posture = execution_boss.max_posture
 	_check(execution_player.deathblow_broken_target(), "deathblow executes a nearby posture-broken boss")
-	_check(execution_boss.is_dead and execution_boss.vitality == 0.0 and execution_boss.deathblow_executed, "deathblow causes one terminal boss execution")
-	_check(not execution_player.deathblow_broken_target() and not execution_boss.receive_deathblow(execution_player), "deathblow cannot be repeated")
+	_check(not execution_boss.is_dead and execution_boss.state == 7 and execution_player.state == 7 and execution_boss.deathblow_executed, "deathblow begins a synchronized attacker-victim execution sequence")
+	var execution_attack_rejected: bool = not execution_player.start_attack("slash")
+	execution_player.dodge()
+	_check(execution_attack_rejected and execution_player.state == 7, "normal combat inputs are locked during the execution")
+	execution_boss._physics_process(0.35)
+	execution_player._physics_process(0.35)
+	_check(not execution_boss.is_dead and execution_boss.state == 7 and execution_boss.execution_timer > 0.0, "victim remains in the execution pose during the cinematic window")
+	execution_boss._physics_process(0.5)
+	execution_player._physics_process(0.5)
+	_check(execution_boss.is_dead and execution_boss.vitality == 0.0 and execution_player.state == 0, "execution animation completes before the boss enters terminal death")
+	_check(not execution_player.deathblow_broken_target() and not execution_boss.receive_deathblow(execution_player), "deathblow cannot be repeated after the cinematic sequence")
 	var distant_player := CharacterBody3D.new()
 	distant_player.set_script(FIGHTER)
 	distant_player.is_player = true

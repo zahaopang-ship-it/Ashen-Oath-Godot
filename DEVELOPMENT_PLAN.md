@@ -192,8 +192,15 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 
 ## M3 — Deathblow and Ashen Warlord signature attack
 - Added a contextual DEATHBLOW touch action and `E` keyboard action. It only succeeds when the target is posture-broken, alive, within execution distance, and in front of the player.
-- A successful deathblow is a one-time terminal execution: it consumes the opportunity, sets vitality to zero, emits dedicated feedback, and enters the existing death state. Repeated, distant, rear-facing, and pre-break attempts are rejected.
+- A successful deathblow now runs a synchronized 0.82-second attacker/victim execution sequence with distinct procedural draw-back, strike, fold, and collapse poses. The victim enters the terminal death state only after the sequence completes. Repeated, distant, rear-facing, and pre-break attempts are rejected.
 - Added the Phase II-only `ashen_rend` attack to the Warlord's pattern. It has a 0.92-second telegraph, distinct broad hit volume, increased damage/posture pressure, and dedicated procedural windup/follow-through poses.
 - Added a crimson signature telegraph and stronger phase-transition impact feedback.
 - Automated checks cover execution eligibility, one-time death, range/facing validation, phase-specific move selection, and signature telegraph timing.
 - Prototype limitation: deathblow is currently a gameplay state/instant finisher, not a cinematic synchronized animation; authored skeletal animation and physical Android input validation remain outstanding.
+
+
+## M3 — Synchronized execution animation pass
+- Replaced the instant deathblow with a timed 0.82-second paired execution state. Attacker and posture-broken victim enter the sequence together and cannot move or accept normal combat actions during it.
+- Added distinct procedural execution poses: attacker draw-back/strike/follow-through and victim fold/collapse. The boss only transitions to DEAD when the sequence timer completes.
+- Added regression checks for paired state entry, movement/attack lockout, mid-animation timing, delayed terminal death, and one-shot execution behavior.
+- This remains procedural transform animation on capsule/primitive characters; it is not yet authored skeletal animation or motion-captured cinematic choreography.
