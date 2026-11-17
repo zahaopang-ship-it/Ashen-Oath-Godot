@@ -420,7 +420,9 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Full headless validation: 309/309 assertions across twelve suites pass. Godot 4.7.2 editor import and main-scene smoke pass; git diff --check passes.
 - Limitations: the current NavigationRegion3D is a coarse rectangular ground polygon; it does not yet carve fence, tree, or prop obstacles from the navmesh. Local physics probes still handle immediate obstacle detours, and dense crowd behavior is only short-range separation. No APK or Android device validation was performed.
 
-## M23 — Fighter construction factory and first architecture boundary
+## M23 — Complete gameplay architecture decomposition
+
+**Status: Complete.** Fighter/world responsibilities are split into focused controllers, data profiles, and feedback services; the compatibility façade remains intentionally small enough to orchestrate those systems. Validation: 18 headless suites / 372 assertions.
 - Extracted the complete runtime fighter assembly pipeline from `main.gd` into `scripts/factories/fighter_factory.gd` (`RefCounted` factory). The factory now owns CharacterBody3D creation, collision capsule setup, sentinel NavigationAgent3D setup, primitive visual rig assembly, weapon pivots, and boss armor additions.
 - `main.gd` now delegates fighter construction through one typed factory entry point; gameplay behavior remains in `fighter.gd` / `boss.gd`, and world orchestration remains in `main.gd`. This is an incremental boundary, not a claim that the large gameplay scripts have already been decomposed.
 - Added `fighter_factory_test.gd` with 12 assertions covering player/sentinel/boss script selection, player role, collision capsule, body/weapon rig, sentinel-only navigation agent, boss armor, and parent attachment.
