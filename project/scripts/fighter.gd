@@ -6,6 +6,8 @@ const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
 const TRAVERSAL_CONTROLLER = preload("res://scripts/traversal/fighter_traversal_controller.gd")
 const PROSTHETIC_CONTROLLER = preload("res://scripts/prosthetics/fighter_prosthetic_controller.gd")
 const EXPLORATION_CONTROLLER = preload("res://scripts/exploration/fighter_exploration_controller.gd")
+const LOCOMOTION_CONTROLLER = preload("res://scripts/movement/fighter_locomotion_controller.gd")
+const COMBAT_RESOLUTION = preload("res://scripts/combat/fighter_combat_resolution.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -603,126 +605,15 @@ func _update_combat_animation(delta: float) -> void:
 		_right_elbow_pivot.rotation.x = lerpf(_right_elbow_pivot.rotation.x, right_elbow_bend, weight)
 
 func _begin_hit_reaction(attacker: Node3D, incoming_kind: String = "slash") -> void:
-	if state == CombatState.POSTURE_BROKEN or is_dead:
-		return
-	hit_reaction_kind = incoming_kind
-	hit_reaction_duration = 0.34 if incoming_kind in ["heavy", "ashen_rend"] else (0.25 if incoming_kind in ["thrust", "sweep", "grab"] else 0.18)
-	state = CombatState.HITSTUN
-	hit_reaction_timer = hit_reaction_duration
-	hit_flash_timer = 0.12 if incoming_kind in ["slash", "thrust"] else 0.18
-	if is_instance_valid(attacker):
-		var away := global_position - attacker.global_position
-		away.y = 0.0
-		if away.length_squared() > 0.001:
-			away = away.normalized()
-			_hit_reaction_side = signf(global_transform.basis.x.dot(away))
-			if is_zero_approx(_hit_reaction_side):
-				_hit_reaction_side = 1.0
-			var knockback := 5.0 if incoming_kind in ["heavy", "ashen_rend"] else (2.2 if incoming_kind == "thrust" else 3.4)
-			velocity.x = away.x * knockback
-			velocity.z = away.z * knockback
+	COMBAT_RESOLUTION.begin_hit_reaction(self, attacker, incoming_kind)
+
 
 func _player_update(delta: float) -> void:
-	if is_swimming:
-		is_sprinting = false
-		sprint_requested = false
-		return
-	if is_vaulting:
-		return
-	if state != CombatState.FREE:
-		velocity.x = move_toward(velocity.x, 0.0, movement_braking * delta)
-		velocity.z = move_toward(velocity.z, 0.0, movement_braking * delta)
-		return
-	var move_dir := _get_player_move_direction()
-	if is_cover_transferring:
-		if not is_instance_valid(_cover_transfer_target):
-			is_cover_transferring = false
-		else:
-			var transfer_goal: Vector3 = _cover_transfer_detour if _cover_transfer_detouring else _cover_transfer_target.global_position
-			var transfer_offset := transfer_goal - global_position
-			transfer_offset.y = 0.0
-			if transfer_offset.length() <= (0.38 if _cover_transfer_detouring else 0.52):
-				if _cover_transfer_detouring:
-					_cover_transfer_detouring = false
-					_cover_transfer_detour = Vector3.ZERO
-				else:
-					is_cover_transferring = false
-					_cover_transfer_target = null
-					velocity.x = 0.0
-					velocity.z = 0.0
-			else:
-				move_dir = transfer_offset.normalized()
-				var probe_motion := move_dir * minf(0.22, transfer_offset.length())
-				if test_move(global_transform, probe_motion):
-					if not _cover_transfer_detouring:
-						var side := Vector3(-move_dir.z, 0.0, move_dir.x)
-						if test_move(global_transform, side * 0.45):
-							side = -side
-						if test_move(global_transform, side * 0.45):
-							_cancel_cover_transfer()
-						else:
-							_cover_transfer_detour = global_position + side * 1.9
-							_cover_transfer_detour.y = global_position.y
-							_cover_transfer_detouring = true
-							move_dir = side
-					else:
-						_cancel_cover_transfer()
-						move_dir = Vector3.ZERO
-	if is_wall_hugging:
-		var wall_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.0, global_position + Vector3.UP * 1.0 - _wall_hug_normal * 0.95)
-		wall_query.exclude = [get_rid()]
-		var wall_hit := get_world_3d().direct_space_state.intersect_ray(wall_query)
-		if wall_hit.is_empty():
-			var old_tangent := Vector3.UP.cross(_wall_hug_normal).normalized()
-			var side_input := signf(input_move.x)
-			if not is_zero_approx(side_input) and _try_wall_corner_transition(old_tangent * side_input):
-				wall_query = PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.0, global_position + Vector3.UP * 1.0 - _wall_hug_normal * 0.95)
-				wall_query.exclude = [get_rid()]
-				wall_hit = get_world_3d().direct_space_state.intersect_ray(wall_query)
-			if wall_hit.is_empty():
-				is_wall_hugging = false
-				_wall_hug_normal = Vector3.ZERO
-		else:
-			_wall_hug_normal = (wall_hit.normal as Vector3).normalized()
-			var tangent := Vector3.UP.cross(_wall_hug_normal).normalized()
-			move_dir = tangent * input_move.x + _wall_hug_normal * input_move.y
-			if move_dir.length_squared() > 1.0:
-				move_dir = move_dir.normalized()
-			var wall_distance: float = Vector2(global_position.x - wall_hit.position.x, global_position.z - wall_hit.position.z).length()
-			var correction := clampf(wall_distance - 0.58, -0.8, 0.8)
-			velocity += -_wall_hug_normal * correction * 5.0 * delta
-		if is_wall_hugging:
-			is_crouching = true
-			is_sprinting = false
-		else:
-			is_crouching = false
-	else:
-		is_sprinting = not is_crouching and (sprint_requested or input_move.length() >= 0.82)
-	var current_speed := move_speed * (0.48 if is_crouching else (1.42 if is_sprinting else 1.0))
-	var desired_velocity := move_dir * current_speed
-	var accel := movement_acceleration if move_dir.length_squared() > 0.001 else movement_braking
-	velocity.x = move_toward(velocity.x, desired_velocity.x, accel * delta)
-	velocity.z = move_toward(velocity.z, desired_velocity.z, accel * delta)
-	if is_instance_valid(_upper_body):
-		_upper_body.position.y = lerpf(_upper_body.position.y, -0.28 if is_crouching else 0.0, 1.0 - exp(-12.0 * delta))
-	if is_crouching:
-		velocity.x *= 0.92
-		velocity.z *= 0.92
-	if is_instance_valid(target) and not target.is_dead:
-		var to_target := target.global_position - global_position
-		to_target.y = 0.0
-		if to_target.length_squared() > 0.04:
-			_face_direction(to_target.normalized(), delta, combat_turn_speed)
-	elif move_dir.length_squared() > 0.001:
-		_face_direction(move_dir, delta)
+	LOCOMOTION_CONTROLLER.update_player(self, delta)
+
 
 func _get_player_move_direction() -> Vector3:
-	var forward := -global_transform.basis.z
-	var right := global_transform.basis.x
-	var move_dir := right * input_move.x + forward * -input_move.y
-	if move_dir.length_squared() > 1.0:
-		move_dir = move_dir.normalized()
-	return move_dir
+	return LOCOMOTION_CONTROLLER.get_player_move_direction(self)
 
 
 func _ai_update(delta: float) -> void:
@@ -998,5 +889,114 @@ func begin_lightning_reversal() -> bool:
 
 func receive_lightning_reversal(defender: Node3D) -> void:
 	PROSTHETIC_CONTROLLER.receive_lightning_reversal(self, defender)
+
+
+func _spawn_lightning_arc(other: Node3D, tint: Color) -> void:
+	PROSTHETIC_CONTROLLER.spawn_lightning_arc(self, other, tint)
+
+
+func upgrade_next_prosthetic() -> bool:
+	return PROSTHETIC_CONTROLLER.upgrade_next_prosthetic(self)
+
+
+func upgrade_prosthetic(tool: String) -> bool:
+	return PROSTHETIC_CONTROLLER.upgrade_prosthetic(self, tool)
+
+
+func receive_distraction(noise_position: Vector3) -> void:
+	STEALTH_AWARENESS.receive_distraction(self, noise_position)
+
+
+func _face_direction(dir: Vector3, delta: float, turn_speed: float = 12.0) -> void:
+	LOCOMOTION_CONTROLLER.face_direction(self, dir, delta, turn_speed)
+
+
+func start_attack(kind: String = "slash") -> bool:
+	if is_dead or state != CombatState.FREE or is_blocking or not ATTACK_KINDS.has(kind):
+		return false
+	if is_player:
+		var noise_radius := 3.2 if is_crouching else 9.5
+		for listener in get_tree().get_nodes_in_group("stealth_guards"):
+			if is_instance_valid(listener) and listener.has_method("emit_noise"):
+				listener.emit_noise(global_position, noise_radius)
+	_attack_token += 1
+	_attack_hit_applied = false
+	attack_kind = kind
+	state = CombatState.WINDUP
+	attack_timer = float(ATTACK_WINDUP[kind])
+	telegraph_started.emit(kind)
+	attack_phase_changed.emit("windup")
+	return true
+
+func _is_target_inside_attack_hitbox(candidate: Node3D) -> bool:
+	if not is_instance_valid(candidate):
+		return false
+	var local_center: Vector3 = global_transform.affine_inverse() * (candidate.global_position + Vector3.UP * 0.9)
+	var half_extents: Vector3 = ATTACK_HITBOX.get(attack_kind, ATTACK_HITBOX["slash"])
+	var vertical_center := 0.45 if attack_kind == "sweep" else 0.9
+	return absf(local_center.x) <= half_extents.x and absf(local_center.y - vertical_center) <= half_extents.y and local_center.z <= -0.22 and local_center.z >= -half_extents.z
+
+func _resolve_attack_hit() -> void:
+	if _attack_hit_applied or not is_instance_valid(target) or target.is_dead:
+		return
+	if not _is_target_inside_attack_hitbox(target):
+		return
+	_attack_hit_applied = true
+	target.receive_strike(float(ATTACK_DAMAGE[attack_kind]), float(ATTACK_POSTURE[attack_kind]), self, attack_kind)
+	attack_hit.emit(target)
+
+func receive_strike(damage: float, posture_damage: float, attacker: Node3D, incoming_kind: String = "slash") -> String:
+	return COMBAT_RESOLUTION.receive_strike(self, damage, posture_damage, attacker, incoming_kind)
+
+
+func receive_deflect(amount: float) -> void:
+	COMBAT_RESOLUTION.receive_deflect(self, amount)
+
+
+func _check_posture_break() -> void:
+	COMBAT_RESOLUTION.check_posture_break(self)
+
+
+func _die() -> void:
+	COMBAT_RESOLUTION.die(self)
+
+
+func set_swim_vertical_input(value: float) -> void:
+	TRAVERSAL_CONTROLLER.set_swim_vertical_input(self, value)
+
+
+func enter_water(surface_y: float) -> void:
+	TRAVERSAL_CONTROLLER.enter_water(self, surface_y)
+
+
+func exit_water() -> void:
+	TRAVERSAL_CONTROLLER.exit_water(self)
+
+
+func try_vertical_climb() -> bool:
+	return TRAVERSAL_CONTROLLER.try_vertical_climb(self)
+
+
+func stop_vertical_climb() -> void:
+	TRAVERSAL_CONTROLLER.stop_vertical_climb(self)
+
+
+func _update_vertical_climb(delta: float) -> void:
+	TRAVERSAL_CONTROLLER.update_vertical_climb(self, delta)
+
+
+func try_ledge_grab() -> bool:
+	return TRAVERSAL_CONTROLLER.try_ledge_grab(self)
+
+
+func _update_ledge_hang(delta: float) -> void:
+	TRAVERSAL_CONTROLLER.update_ledge_hang(self, delta)
+
+
+func set_checkpoint(position: Vector3) -> void:
+	EXPLORATION_CONTROLLER.set_checkpoint(self, position)
+
+
+func get_nearest_rest_point(max_distance: float = 2.8) -> Node3D:
 
 [executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]

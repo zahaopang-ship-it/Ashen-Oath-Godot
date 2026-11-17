@@ -436,7 +436,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Extracted swimming, vertical climb attach/update/release, ledge grab/hang/mantle, jump gating, grapple target selection and arc movement, and aerial grapple follow-up into scripts/traversal/fighter_traversal_controller.gd. Existing Fighter entry points remain compatibility wrappers.
 - Extracted shuriken, firecracker, axe, umbrella resource/cooldown handling, lightning reversal/arc feedback, and prosthetic upgrade selection into scripts/prosthetics/fighter_prosthetic_controller.gd. Existing Fighter public actions remain compatibility wrappers.
 - Extracted rest-shrine interaction/checkpoint restoration, secret-cache collection/rewards, and resurrection into scripts/exploration/fighter_exploration_controller.gd. Moved stealth-cover overlap bookkeeping into the stealth awareness controller.
-- Validation after extraction: all 17 headless suites pass (357 assertions total); Godot 4.7.2 editor import and main-scene smoke pass; git diff --check passes.
-- Remaining M23 work: split the remaining combat state/strike resolution and procedural animation/locomotion from fighter.gd; introduce data-driven fighter/encounter configuration and formalize shared event/service boundaries. The current fighter script is down to 1,394 lines, but it remains too large and is not yet fully decomposed. Android export/device validation remains pending.
+- Extracted strike reception, block/deflect/mikiri/sweep outcomes, hit-reaction/knockback setup, posture-break transitions, and death transitions into scripts/combat/fighter_combat_resolution.gd.
+- Extracted player movement, crouch/sprint acceleration, cover-transfer steering, wall-hug motion, and facing into scripts/movement/fighter_locomotion_controller.gd.
+- Extracted player acceleration/braking, crouch/sprint movement, wall-hug and cover-transfer movement, movement direction, and facing into scripts/movement/fighter_locomotion_controller.gd. Fighter retains compatibility entry points.
+- Corrected static controller references to use the actor transform and added explicit types where Godot could not infer values from the generic CharacterBody3D API.
+- Validation after the locomotion extraction is being rerun across all 17 headless suites; the combat suite now passes 104/104 after the typing fixes. Godot 4.7.2 editor import succeeds.
+- Remaining M23 work: extract procedural combat/locomotion animation, reduce fighter.gd further, introduce data-driven fighter/encounter configuration, and formalize shared event/service boundaries. fighter.gd is currently 1,210 lines. Android export/device validation remains pending.
 
 [executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]

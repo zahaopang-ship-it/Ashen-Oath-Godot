@@ -12,8 +12,12 @@ Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-i
 - Sentinel decision selection, attack choice, investigation movement, and patrol progression are isolated in scripts/ai/sentinel_ai_controller.gd.
 - Swimming, vertical climbing, ledge hanging/mantling, jump gating, grapple targeting/arcing movement, and aerial grapple follow-up are isolated in scripts/traversal/fighter_traversal_controller.gd.
 - Shuriken, firecracker, axe, umbrella costs/effects, lightning reversal, and prosthetic upgrades are isolated in scripts/prosthetics/fighter_prosthetic_controller.gd.
+- Player movement, crouch/sprint acceleration, cover transfers, wall-hug movement, and facing are isolated in scripts/movement/fighter_locomotion_controller.gd.
+- Strike reception, deflect/mikiri/sweep outcomes, hit reactions, posture-break transitions, and death transitions are isolated in scripts/combat/fighter_combat_resolution.gd.
 - Rest shrines, checkpoints, secret-cache rewards, and resurrection are isolated in scripts/exploration/fighter_exploration_controller.gd.
-- main.gd now focuses on encounter orchestration, combat feedback, camera/input orchestration, and connecting runtime systems. The 1,394-line fighter controller remains the largest architectural hotspot; combat, AI/stealth, traversal, prosthetics, and animation need further extraction.
+- Strike reception, deflect/mikiri/sweep outcomes, hit reactions, posture-break transitions, and death transitions are isolated in scripts/combat/fighter_combat_resolution.gd.
+- Player acceleration/braking, crouch/sprint movement, wall-hug and cover-transfer movement, movement direction, and facing are isolated in scripts/movement/fighter_locomotion_controller.gd; Fighter retains thin entry points.
+- main.gd now focuses on encounter orchestration, combat feedback, camera/input orchestration, and connecting runtime systems. fighter.gd is now about 1,210 lines; procedural combat animation and data-driven fighter/encounter configuration remain major refactor targets.
 
 ## Current milestone
 - Godot 4.7.2 mobile-first 3D action prototype with Vitality/Posture combat, buffered combos, deflects, Mikiri/sweep counters, hitstop, and a two-phase boss.
