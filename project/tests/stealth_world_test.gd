@@ -32,6 +32,16 @@ func _run() -> void:
 	_check(player.is_in_cover, "player entering a cover zone is detected by the physics area")
 	_check(is_equal_approx(guard._get_target_vision_multiplier(player), 0.16), "crouched player in cover receives deep concealment")
 	_check(not guard._has_clear_line_of_sight(player), "solid cover geometry blocks guard line of sight")
+	guard.last_known_target_position = Vector3(-5.0, 0.0, -4.0)
+	guard._begin_cover_search()
+	_check(guard._search_points.size() == 4, "guard search route includes last known position and three nearby cover locations")
+	_check(guard._search_points[0].is_equal_approx(guard.last_known_target_position), "guard begins investigation at last known sighting, not the hidden player's live position")
+	_check(guard._search_point_index == 0 and guard._search_pause_timer > 0.0, "cover investigation initializes a pause-and-inspect state")
+	guard.awareness_state = guard.AwarenessState.SEARCHING
+	var expected_search_direction: Vector3 = (guard._search_points[0] - guard.global_position).normalized()
+	guard._ai_update(0.1)
+	var actual_search_velocity := Vector3(guard.velocity.x, 0.0, guard.velocity.z)
+	_check(actual_search_velocity.dot(expected_search_direction) > 0.1, "searching guard physically moves toward the last known position")
 	player.global_position = Vector3(0.0, 0.0, 4.0)
 	await physics_frame
 	await physics_frame
@@ -115,7 +125,7 @@ func _run() -> void:
 	_check(player._try_wall_corner_transition(Vector3.RIGHT), "wall-hug detects an adjacent perpendicular wall at a corner")
 	_check(absf(player._wall_hug_normal.x) > 0.9, "wall-hug updates its normal to follow the new wall plane")
 	if failures.is_empty():
-		print("Stealth world tests: 20/20 passed")
+		print("Stealth world tests: 24/24 passed")
 	else:
-		printerr("Stealth world tests: ", 20 - failures.size(), "/20 passed")
+		printerr("Stealth world tests: ", 24 - failures.size(), "/24 passed")
 	quit(0 if failures.is_empty() else 1)

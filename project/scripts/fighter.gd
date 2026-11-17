@@ -84,6 +84,9 @@ var _wall_hug_normal := Vector3.ZERO
 var _wall_hug_side := 0.0
 var _search_scan_time := 0.0
 var _search_origin_yaw := 0.0
+var _search_points: Array[Vector3] = []
+var _search_point_index := 0
+var _search_pause_timer := 0.0
 var body_collision: CollisionShape3D
 var patrol_points: Array[Vector3] = []
 var patrol_index := 0
@@ -603,21 +606,37 @@ func _ai_update(delta: float) -> void:
 					chosen = "grab"
 				start_attack(chosen)
 	elif awareness_state == AwarenessState.SEARCHING:
-		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
-		var search_dir := last_known_target_position - global_position
-		search_dir.y = 0.0
-		if search_dir.length() > 0.65:
-			_face_direction(search_dir.normalized(), delta, 5.0)
+		search_timer -= delta
+		if _search_point_index < _search_points.size():
+			var search_dir := _search_points[_search_point_index] - global_position
+			search_dir.y = 0.0
+			if search_dir.length() > 0.55:
+				var direction := search_dir.normalized()
+				velocity.x = direction.x * patrol_speed * 0.9
+				velocity.z = direction.z * patrol_speed * 0.9
+				_face_direction(direction, delta, 5.0)
+			else:
+				velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
+				velocity.z = move_toward(velocity.z, 0.0, 20.0 * delta)
+				_search_pause_timer -= delta
+				_search_scan_time += delta
+				var scan_angle := sin(_search_scan_time * 2.8) * 0.78
+				rotation.y = lerp_angle(rotation.y, _search_origin_yaw + scan_angle, 1.0 - exp(-3.5 * delta))
+				if _search_pause_timer <= 0.0:
+					_search_point_index += 1
+					_search_pause_timer = 0.85
+					_search_origin_yaw = rotation.y
 		else:
-			search_timer -= delta
+			velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
+			velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
 			_search_scan_time += delta
 			var scan_angle := sin(_search_scan_time * 2.8) * 0.78
 			rotation.y = lerp_angle(rotation.y, _search_origin_yaw + scan_angle, 1.0 - exp(-3.5 * delta))
-			if search_timer <= 0.0:
-				awareness_state = AwarenessState.IDLE
-				suspicion = 0.0
-				_search_scan_time = 0.0
+		if search_timer <= 0.0 or _search_point_index >= _search_points.size():
+			awareness_state = AwarenessState.IDLE
+			suspicion = 0.0
+			_search_scan_time = 0.0
+			_search_points.clear()
 	elif awareness_state == AwarenessState.IDLE:
 		_patrol_update(delta)
 
@@ -836,9 +855,30 @@ func _update_awareness(delta: float) -> void:
 			lost_sight_timer += delta
 			if lost_sight_timer >= 4.0:
 				awareness_state = AwarenessState.SEARCHING
-				search_timer = 3.8
+				search_timer = 12.0
 				_search_origin_yaw = rotation.y
 				_search_scan_time = 0.0
+				_begin_cover_search()
+
+func _begin_cover_search() -> void:
+	_search_points.clear()
+	_search_point_index = 0
+	_search_pause_timer = 0.85
+	_search_points.append(last_known_target_position)
+	var candidates: Array[Vector3] = []
+	for zone in get_tree().get_nodes_in_group("stealth_cover_zones"):
+		if not is_instance_valid(zone):
+			continue
+		var point: Vector3 = zone.global_position
+		var offset := point - last_known_target_position
+		offset.y = 0.0
+		if offset.length() <= 6.5:
+			candidates.append(point)
+	candidates.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+		return Vector2(a.x - last_known_target_position.x, a.z - last_known_target_position.z).length_squared() < Vector2(b.x - last_known_target_position.x, b.z - last_known_target_position.z).length_squared()
+	)
+	for point in candidates:
+		_search_points.append(point)
 
 func _get_target_vision_multiplier(candidate: Node3D) -> float:
 	if not is_instance_valid(candidate):

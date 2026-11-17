@@ -320,3 +320,9 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added regression checks for detecting an adjacent perpendicular wall and adopting its new surface normal.
 - Headless validation: combat 104/104, boss 22/22, feedback integration 5/5, stealth world 20/20; editor import and main-scene smoke passed; `git diff --check` passed.
 - Limitation: corner traversal currently requires lateral input and uses a single probe, so it supports clean 90-degree corners but not arbitrary curved walls, narrow gaps, or automatic cover-to-cover pathfinding. Sentinel search still uses a timed yaw scan at the last known location; it does not yet physically inspect each cover prop. Android device validation remains pending.
+
+## M12 — Guard cover investigation
+- When an alerted guard loses sight of the player for four seconds, it now builds a bounded investigation route from the last known position and nearby stealth-cover zones (within 6.5 m).
+- The guard walks to the last known position, then visits nearby bushes/crates in nearest-first order, pausing and scanning at each point before continuing. The route is based on remembered sighting data, not the player's current hidden position.
+- Added regression checks for route composition, memory-only search origin, pause initialization, and actual movement toward the last known location.
+- Limitation: this is a simple waypoint investigation, not full navigation/pathfinding; collision geometry can still obstruct direct travel. It does not guarantee that every prop is reachable. Android device validation remains pending.
