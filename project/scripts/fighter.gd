@@ -39,6 +39,9 @@ var _body_material: StandardMaterial3D
 var ai_timer := 0.8
 var gravity := 22.0
 var attack_kind := "slash"
+var is_mikiri_countering := false
+var is_sweep_evading := false
+var counter_timer := 0.0
 var _attack_hit_applied := false
 var _attack_token := 0
 
@@ -47,6 +50,10 @@ const ACTIVE_TIME := 0.10
 const RECOVERY_TIME := 0.34
 const POSTURE_BREAK_TIME := 1.35
 const HIT_FLASH_COLOR := Color(1.0, 0.72, 0.58)
+const ATTACK_KINDS := ["slash", "thrust", "sweep", "heavy"]
+const ATTACK_DAMAGE := {"slash": 22.0, "thrust": 27.0, "sweep": 18.0, "heavy": 34.0}
+const ATTACK_POSTURE := {"slash": 30.0, "thrust": 36.0, "sweep": 24.0, "heavy": 46.0}
+const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0.62}
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
@@ -55,6 +62,10 @@ func _physics_process(delta: float) -> void:
 	deflect_timer = maxf(0.0, deflect_timer - delta)
 	deflect_cooldown = maxf(0.0, deflect_cooldown - delta)
 	dodge_timer = maxf(0.0, dodge_timer - delta)
+	counter_timer = maxf(0.0, counter_timer - delta)
+	if counter_timer <= 0.0:
+		is_mikiri_countering = false
+		is_sweep_evading = false
 	is_deflecting = deflect_timer > 0.0
 	is_dodging = dodge_timer > 0.0
 	if state == CombatState.HITSTUN:
@@ -158,7 +169,15 @@ func _ai_update(delta: float) -> void:
 	if ai_timer <= 0.0 and distance <= attack_range:
 		ai_timer = randf_range(1.15, 1.75)
 		if randf() < 0.72:
-			start_attack("slash")
+			var roll := randf()
+			var chosen := "slash"
+			if roll < 0.18:
+				chosen = "thrust"
+			elif roll < 0.34:
+				chosen = "sweep"
+			elif roll < 0.48:
+				chosen = "heavy"
+			start_attack(chosen)
 
 func _face_direction(dir: Vector3, delta: float) -> void:
 	if dir.length_squared() < 0.001:
@@ -167,13 +186,13 @@ func _face_direction(dir: Vector3, delta: float) -> void:
 	rotation.y = lerp_angle(rotation.y, target_angle, 1.0 - exp(-12.0 * delta))
 
 func start_attack(kind: String = "slash") -> bool:
-	if is_dead or state != CombatState.FREE or is_blocking:
+	if is_dead or state != CombatState.FREE or is_blocking or not ATTACK_KINDS.has(kind):
 		return false
 	_attack_token += 1
 	_attack_hit_applied = false
 	attack_kind = kind
 	state = CombatState.WINDUP
-	attack_timer = WINDUP_TIME
+	attack_timer = float(ATTACK_WINDUP[kind])
 	telegraph_started.emit(kind)
 	attack_phase_changed.emit("windup")
 	return true
@@ -189,18 +208,31 @@ func _resolve_attack_hit() -> void:
 	if offset.length_squared() > 0.001 and facing.normalized().dot(offset.normalized()) < 0.15:
 		return
 	_attack_hit_applied = true
-	target.receive_strike(attack_damage, attack_posture_damage, self)
+	target.receive_strike(float(ATTACK_DAMAGE[attack_kind]), float(ATTACK_POSTURE[attack_kind]), self, attack_kind)
 	attack_hit.emit(target)
 
-func receive_strike(damage: float, posture_damage: float, attacker: Node3D) -> String:
+func receive_strike(damage: float, posture_damage: float, attacker: Node3D, incoming_kind: String = "slash") -> String:
 	if is_dead or is_dodging:
 		return "evaded"
+	if incoming_kind == "thrust" and is_mikiri_countering:
+		is_mikiri_countering = false
+		counter_timer = 0.0
+		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
+			attacker.receive_deflect(48.0)
+		return "mikiri"
+	if incoming_kind == "sweep" and is_sweep_evading:
+		is_sweep_evading = false
+		counter_timer = 0.0
+		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
+			attacker.receive_deflect(32.0)
+		return "sweep_evaded"
 	if is_deflecting:
 		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
-			attacker.receive_deflect(26.0)
+			attacker.receive_deflect(40.0 if incoming_kind == "heavy" else 26.0)
 		return "deflected"
 	if is_blocking:
-		posture += posture_damage * 0.55
+		var block_scale := 0.85 if incoming_kind == "heavy" else (0.72 if incoming_kind == "thrust" else 0.55)
+		posture += posture_damage * block_scale
 		_check_posture_break()
 		return "blocked"
 	vitality = maxf(0.0, vitality - damage)
@@ -237,6 +269,23 @@ func _die() -> void:
 	is_blocking = false
 	velocity = Vector3.ZERO
 	died.emit()
+
+func begin_mikiri_counter() -> bool:
+	if is_dead or state != CombatState.FREE:
+		return false
+	is_mikiri_countering = true
+	is_sweep_evading = false
+	counter_timer = 0.28
+	return true
+
+func begin_sweep_evade() -> bool:
+	if is_dead or state != CombatState.FREE:
+		return false
+	is_sweep_evading = true
+	is_mikiri_countering = false
+	counter_timer = 0.60
+	velocity.y = 5.8
+	return true
 
 func begin_deflect() -> bool:
 	if is_dead or state != CombatState.FREE or deflect_cooldown > 0.0:

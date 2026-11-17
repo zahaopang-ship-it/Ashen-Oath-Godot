@@ -73,12 +73,31 @@ func _run() -> void:
 	stunned.call("_update_hit_reaction", 0.25)
 	_check(stunned.state == 0, "hitstun recovers to neutral after its timer")
 
+	var countering := _new_fighter("Countering", Vector3.ZERO)
+	var thrust_source := _new_fighter("ThrustSource", Vector3(0, 0, -1))
+	_check(countering.begin_mikiri_counter(), "Mikiri counter opens from neutral")
+	_check(countering.receive_strike(27.0, 36.0, thrust_source, "thrust") == "mikiri", "Mikiri defeats a thrust attack")
+	_check(is_equal_approx(thrust_source.posture, 48.0), "Mikiri applies strong posture punishment")
+
+	var jumping := _new_fighter("Jumping", Vector3.ZERO)
+	var sweep_source := _new_fighter("SweepSource", Vector3(0, 0, -1))
+	_check(jumping.begin_sweep_evade(), "jump counter opens and launches upward")
+	_check(is_equal_approx(jumping.counter_timer, 0.60), "jump counter window covers the sweep telegraph")
+	_check(jumping.receive_strike(18.0, 24.0, sweep_source, "sweep") == "sweep_evaded", "jump evades a sweep attack")
+	_check(is_equal_approx(sweep_source.posture, 32.0), "sweep evade punishes attacker posture")
+
+	var heavy_guard := _new_fighter("HeavyGuard", Vector3.ZERO)
+	heavy_guard.begin_block()
+	_check(heavy_guard.receive_strike(34.0, 46.0, attacker, "heavy") == "blocked", "heavy attack can be guarded")
+	_check(is_equal_approx(heavy_guard.posture, 39.1), "heavy guard causes increased posture damage")
+	_check(not heavy_guard.start_attack("invalid"), "unknown attack kinds are rejected")
+
 	var dodger := _new_fighter("Dodger", Vector3.ZERO)
 	dodger.dodge()
 	_check(dodger.is_dodging, "dodge grants an active evasion window")
 	_check(dodger.receive_strike(20.0, 20.0, attacker) == "evaded", "dodge window evades incoming strike")
 
-	print("Combat tests: ", 25 - failures.size(), "/25 passed")
+	print("Combat tests: ", 34 - failures.size(), "/34 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:

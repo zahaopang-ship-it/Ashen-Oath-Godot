@@ -112,3 +112,14 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Combat M1 is still a prototype: the telegraph is a simple emissive marker, camera feedback is a lightweight impulse, and there are no animation-driven hitboxes, authored hit-reaction animations, spatial audio, boss, or Android export yet.
 - The Linux container has no graphical desktop or physical touchscreen; Android rendering, safe areas, and true simultaneous multitouch remain unverified.
 - GitHub repository: https://github.com/zahaopang-ship-it/Ashen-Oath-Godot (private), branch `main`. Push every stable checkpoint here; never use an unrelated repository.
+
+
+## M1 combat expansion — attack classes and counters
+- Added four validated attack classes: slash, thrust, sweep, and heavy, each with distinct windup, vitality damage, and posture pressure.
+- Enemy AI now selects from the attack classes instead of using slash exclusively.
+- Telegraph orb color identifies the incoming attack class (slash red, thrust amber, sweep cyan, heavy violet).
+- Added a short Mikiri counter window against thrust attacks and a 0.60-second jump-evasion window against sweep attacks; successful counters punish attacker posture.
+- Heavy attacks remain deflectable but deal substantially more posture damage through guard.
+- Added dedicated mobile HUD actions and keyboard shortcuts for Mikiri and jump.
+- Headless combat suite: 34/34 assertions passed; editor import and main-scene smoke run completed successfully.
+- Still prototype scope: no animation-driven hitboxes, production character assets, Android device test, or APK in this milestone.

@@ -63,8 +63,10 @@ func _build_ui() -> void:
 	_register_action("DEFLECT", Vector2(-115, -250), "deflect", Color(0.72, 0.55, 0.20))
 	_register_action("BLOCK", Vector2(-275, -250), "block", Color(0.25, 0.37, 0.48))
 	_register_action("DODGE", Vector2(-95, -70), "dodge", Color(0.25, 0.42, 0.32))
+	_register_action("MIKIRI", Vector2(-275, -70), "mikiri", Color(0.58, 0.25, 0.12))
+	_register_action("JUMP", Vector2(-195, -70), "jump", Color(0.18, 0.42, 0.55))
 	var hint := Label.new()
-	hint.text = "WASD move  J attack  K deflect  L block  Space dodge"
+	hint.text = "WASD move  J attack  K deflect  L block  Space dodge  I Mikiri  O jump"
 	hint.position = Vector2(28, 132)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -152,6 +154,8 @@ func _action_down(action: String) -> void:
 		"deflect": game.player.begin_deflect()
 		"block": game.player.begin_block()
 		"dodge": game.player.dodge()
+		"mikiri": game.player.begin_mikiri_counter()
+		"jump": game.player.begin_sweep_evade()
 
 func _action_up(action: String) -> void:
 	match action:

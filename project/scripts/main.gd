@@ -18,6 +18,7 @@ func _ready() -> void:
 	player.target = enemy
 	enemy.target = player
 	enemy.attack_phase_changed.connect(_on_enemy_attack_phase)
+	enemy.telegraph_started.connect(_on_enemy_telegraph_started)
 	enemy.attack_hit.connect(_on_enemy_attack_hit)
 	player.attack_hit.connect(_on_player_attack_hit)
 	_create_telegraph_marker()
@@ -127,6 +128,21 @@ func _create_telegraph_marker() -> void:
 	telegraph_marker.visible = false
 	enemy.add_child(telegraph_marker)
 
+func _on_enemy_telegraph_started(kind: String) -> void:
+	if not is_instance_valid(telegraph_marker):
+		return
+	var material := telegraph_marker.material_override as StandardMaterial3D
+	if not material:
+		return
+	var colors := {
+		"slash": Color(1.0, 0.16, 0.055),
+		"thrust": Color(1.0, 0.72, 0.08),
+		"sweep": Color(0.18, 0.72, 1.0),
+		"heavy": Color(0.78, 0.12, 1.0)
+	}
+	material.albedo_color = colors.get(kind, Color(1.0, 0.16, 0.055))
+	material.emission = material.albedo_color
+
 func _on_enemy_attack_phase(phase: String) -> void:
 	if not is_instance_valid(telegraph_marker):
 		return
@@ -163,6 +179,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_K: player.begin_deflect()
 			KEY_L: player.begin_block()
 			KEY_SPACE: player.dodge()
+			KEY_I: player.begin_mikiri_counter()
+			KEY_O: player.begin_sweep_evade()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:
