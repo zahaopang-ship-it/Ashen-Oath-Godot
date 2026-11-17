@@ -2,6 +2,7 @@ extends CharacterBody3D
 
 const NAVIGATION_STEERING = preload("res://scripts/ai/sentinel_navigation_steering.gd")
 const STEALTH_AWARENESS = preload("res://scripts/ai/stealth_awareness_controller.gd")
+const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -722,87 +723,12 @@ func _get_player_move_direction() -> Vector3:
 
 
 func _ai_update(delta: float) -> void:
-	if state != CombatState.FREE:
-		return
-	if is_instance_valid(target) and not target.is_dead:
-		_update_awareness(delta)
-	else:
-		_patrol_update(delta)
-		return
-	var to_target := target.global_position - global_position
-	to_target.y = 0.0
-	var distance := to_target.length()
-	if awareness_state == AwarenessState.ALERTED:
-		if distance > 1.7:
-			_steer_ai_toward(target.global_position, move_speed * 0.72, delta, combat_turn_speed)
-		else:
-			velocity.x = move_toward(velocity.x, 0.0, 22.0 * delta)
-			velocity.z = move_toward(velocity.z, 0.0, 22.0 * delta)
-		ai_timer -= delta
-		if ai_timer <= 0.0 and distance <= attack_range:
-			ai_timer = randf_range(1.15, 1.75)
-			if randf() < 0.72:
-				var roll := randf()
-				var chosen := "slash"
-				if roll < 0.18:
-					chosen = "thrust"
-				elif roll < 0.34:
-					chosen = "sweep"
-				elif roll < 0.48:
-					chosen = "heavy"
-				elif roll < 0.57:
-					chosen = "grab"
-				start_attack(chosen)
-	elif awareness_state == AwarenessState.SEARCHING:
-		search_timer -= delta
-		if _search_point_index < _search_points.size():
-			var search_dir := _search_points[_search_point_index] - global_position
-			search_dir.y = 0.0
-			if search_dir.length() > 0.55:
-				_steer_ai_toward(_search_points[_search_point_index], patrol_speed * 0.9, delta, 5.0)
-			else:
-				velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
-				velocity.z = move_toward(velocity.z, 0.0, 20.0 * delta)
-				_search_pause_timer -= delta
-				_search_scan_time += delta
-				var scan_angle := sin(_search_scan_time * 2.8) * 0.78
-				rotation.y = lerp_angle(rotation.y, _search_origin_yaw + scan_angle, 1.0 - exp(-3.5 * delta))
-				if _search_pause_timer <= 0.0:
-					_search_point_index += 1
-					_search_pause_timer = 0.85
-					_search_origin_yaw = rotation.y
-		else:
-			velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
-			velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
-			_search_scan_time += delta
-			var scan_angle := sin(_search_scan_time * 2.8) * 0.78
-			rotation.y = lerp_angle(rotation.y, _search_origin_yaw + scan_angle, 1.0 - exp(-3.5 * delta))
-		if search_timer <= 0.0 or _search_point_index >= _search_points.size():
-			awareness_state = AwarenessState.IDLE
-			suspicion = 0.0
-			_search_scan_time = 0.0
-			_search_points.clear()
-	elif awareness_state == AwarenessState.IDLE:
-		_patrol_update(delta)
+	SENTINEL_AI.update(self, delta)
+
 
 func _patrol_update(delta: float) -> void:
-	if patrol_points.is_empty():
-		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
-		return
-	if patrol_wait_timer > 0.0:
-		patrol_wait_timer = maxf(0.0, patrol_wait_timer - delta)
-		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
-		return
-	var waypoint := patrol_points[patrol_index % patrol_points.size()]
-	var direction := waypoint - global_position
-	direction.y = 0.0
-	if direction.length() <= 0.45:
-		patrol_index = (patrol_index + 1) % patrol_points.size()
-		patrol_wait_timer = _patrol_pause
-		return
-	_steer_ai_toward(waypoint, patrol_speed, delta, 4.0)
+	SENTINEL_AI.update_patrol(self, delta)
+
 
 func _steer_ai_toward(destination: Vector3, speed: float, delta: float, turn_speed: float) -> void:
 	NAVIGATION_STEERING.steer_toward(self, destination, speed, delta, turn_speed)
