@@ -3,21 +3,19 @@
 Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-inspired combat, not affiliated with FromSoftware or Sekiro.
 
 ## Architecture progress
-- Fighter creation is isolated in scripts/factories/fighter_factory.gd; it builds the physics body, primitive rig, weapon pivots, optional sentinel navigation agent, and boss armor.
-- Ashen Vale environment construction is isolated in scripts/world/world_builder.gd. The builder owns environment generation and trigger wiring while preserving main-scene node paths and callback compatibility.
-- Desktop debug keyboard mappings are isolated in scripts/input/player_input_router.gd and still invoke the same Fighter action methods used by the touch HUD.
-- Third-person follow framing, drag rotation, telegraph pulsing, camera impulse, and shake are isolated in scripts/camera/combat_camera_rig.gd.
-- Shared NavigationAgent route consumption, ray-probe obstacle steering, and sentinel crowd separation are isolated in scripts/ai/sentinel_navigation_steering.gd; Fighter retains compatibility wrappers.
-- Sentinel perception, suspicion buildup/decay, vision-cone checks, line of sight, noise response, and cover-search waypoint generation are isolated in scripts/ai/stealth_awareness_controller.gd; Fighter retains the public compatibility methods.
-- Sentinel decision selection, attack choice, investigation movement, and patrol progression are isolated in scripts/ai/sentinel_ai_controller.gd.
-- Swimming, vertical climbing, ledge hanging/mantling, jump gating, grapple targeting/arcing movement, and aerial grapple follow-up are isolated in scripts/traversal/fighter_traversal_controller.gd.
-- Shuriken, firecracker, axe, umbrella costs/effects, lightning reversal, and prosthetic upgrades are isolated in scripts/prosthetics/fighter_prosthetic_controller.gd.
-- Player movement, crouch/sprint acceleration, cover transfers, wall-hug movement, and facing are isolated in scripts/movement/fighter_locomotion_controller.gd.
-- Strike reception, deflect/mikiri/sweep outcomes, hit reactions, posture-break transitions, and death transitions are isolated in scripts/combat/fighter_combat_resolution.gd.
-- Rest shrines, checkpoints, secret-cache rewards, and resurrection are isolated in scripts/exploration/fighter_exploration_controller.gd.
-- Strike reception, deflect/mikiri/sweep outcomes, hit reactions, posture-break transitions, and death transitions are isolated in scripts/combat/fighter_combat_resolution.gd.
-- Player acceleration/braking, crouch/sprint movement, wall-hug and cover-transfer movement, movement direction, and facing are isolated in scripts/movement/fighter_locomotion_controller.gd; Fighter retains thin entry points.
-- main.gd now focuses on encounter orchestration, combat feedback, camera/input orchestration, and connecting runtime systems. fighter.gd is now about 1,210 lines; procedural combat animation and data-driven fighter/encounter configuration remain major refactor targets.
+- Fighter assembly is isolated in `scripts/factories/fighter_factory.gd`; it builds physics, rig, weapon pivots, sentinel navigation, and boss armor.
+- World generation is isolated in `scripts/world/world_builder.gd`; main-scene node paths remain compatible.
+- Player debug keyboard dispatch and third-person camera behavior are isolated in `scripts/input/player_input_router.gd` and `scripts/camera/combat_camera_rig.gd`.
+- Sentinel navigation, perception, awareness, patrol decisions, and local separation are split across focused modules in `scripts/ai/`.
+- Swimming, climbing, ledge traversal, grappling, vaulting, mantling, wall-hug, crouch, and cover-transfer movement are isolated in `scripts/traversal/fighter_traversal_controller.gd`.
+- Prosthetic effects/upgrades and shrine/cache/resurrection interactions are isolated in `scripts/prosthetics/` and `scripts/exploration/`.
+- Player movement, cover transfer, wall-hug, and facing are isolated in `scripts/movement/fighter_locomotion_controller.gd`.
+- Strike reception, deflect/counter outcomes, hit reactions, posture breaks, and death transitions are isolated in `scripts/combat/fighter_combat_resolution.gd`; attack hit volumes/combo buffering and defensive/execution actions live in separate combat controllers.
+- Procedural rig binding, gait, attack/guard/hit/death poses, and animation blending are isolated in `scripts/animation/fighter_animation_controller.gd`.
+- Fighter archetype tuning is data-driven through `FighterConfig` resources for the player, sentinel, and Ashen Warlord. Encounter spawn points, patrol routes, cover, grapple anchors, water, climb wall, shrines, and cache placements live in `resources/encounters/ashen_vale.tres`.
+- Hitstop, impact-camera requests, deflect clash VFX, and spatial combat SFX are delegated to `scripts/services/combat_feedback_service.gd`.
+- `main.gd` focuses on encounter orchestration and connects the world, camera, input, and feedback services. `fighter.gd` is now a compact gameplay façade (573 lines): core physics/state progression stays there while feature behavior is delegated to focused controllers.
+- No Android package was exported as part of this refactor; export/device validation is intentionally pending until explicit authorization.
 
 ## Current milestone
 - Godot 4.7.2 mobile-first 3D action prototype with Vitality/Posture combat, buffered combos, deflects, Mikiri/sweep counters, hitstop, and a two-phase boss.
