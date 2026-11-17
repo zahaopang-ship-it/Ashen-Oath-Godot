@@ -343,3 +343,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Axe applies a close-range heavy impact with strong posture pressure and a dedicated procedural swing pose. Umbrella creates a 1.25-second timed guard window, including a broader defensive pose, then closes automatically.
 - Added spirit-energy HUD bar and regression tests for targeting, damage, distraction, guard interruption, timed defense, energy costs, and invalid tool use.
 - Limitation: these are prototype gameplay implementations and primitive VFX, not final Sekiro-grade authored animations, models, or sound design. Umbrella currently uses the existing guard/block damage rules; lightning reversal and prosthetic upgrades are not implemented. Android touch/performance validation remains pending.
+
+
+## M15 — Lightning reversal and prosthetic upgrades
+- Added a Phase II-only lightning attack to the Ashen Warlord's sequence with a 1.05-second blue telegraph and a dedicated attack hit volume.
+- Player can activate Lightning Reversal only while airborne; the 0.85-second counter window must overlap the incoming lightning hit. A successful reversal negates player damage, consumes the window, reflects an emissive arc, and inflicts 82 posture plus a heavy stagger on the boss. A grounded or mistimed counter receives normal damage.
+- Added three prototype upgrade tokens and a rotating upgrade selector (keyboard U / touchscreen UPGRADE). Up to three levels per tool: Shuriken damage/posture, Firecracker distraction radius, Axe damage/posture, and Umbrella duration improve; each upgrade reduces that tool's emblem cost by 8% (minimum 8).
+- Added regression coverage for airborne-only activation, timing-window consumption, damage prevention, reflected stagger/VFX, phase-two lightning telegraph, and upgrade spending/selection.
+- Limitation: the upgrade tokens are prototype starting resources, not yet earned from a progression or save system. Lightning is a procedural beam placeholder; no authored lightning animation, sound, or Android device validation yet.

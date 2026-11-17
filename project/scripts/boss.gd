@@ -6,7 +6,7 @@ const PHASE_ONE := 1
 const PHASE_TWO := 2
 const PHASE_TWO_THRESHOLD := 0.55
 const PHASE_ONE_PATTERN := ["slash", "thrust", "heavy", "slash"]
-const PHASE_TWO_PATTERN := ["sweep", "grab", "thrust", "ashen_rend"]
+const PHASE_TWO_PATTERN := ["sweep", "grab", "thrust", "lightning", "ashen_rend"]
 
 var boss_phase := PHASE_ONE
 var pattern_index := 0
@@ -75,6 +75,8 @@ func _resolve_attack_hit() -> void:
 		return
 	_attack_hit_applied = true
 	var damage_scale := 1.0 if boss_phase == PHASE_ONE else phase_two_damage_scale
+	if attack_kind == "lightning":
+		_spawn_lightning_arc(target, Color(0.24, 0.72, 1.0))
 	target.receive_strike(float(ATTACK_DAMAGE[attack_kind]) * damage_scale, float(ATTACK_POSTURE[attack_kind]) * damage_scale, self, attack_kind)
 	attack_hit.emit(target)
 

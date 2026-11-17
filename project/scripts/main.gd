@@ -325,7 +325,8 @@ func _on_enemy_telegraph_started(kind: String) -> void:
 		"sweep": Color(0.18, 0.72, 1.0),
 		"heavy": Color(0.78, 0.12, 1.0),
 		"grab": Color(1.0, 0.92, 0.72),
-		"ashen_rend": Color(1.0, 0.035, 0.015)
+		"ashen_rend": Color(1.0, 0.035, 0.015),
+		"lightning": Color(0.18, 0.78, 1.0)
 	}
 	material.albedo_color = colors.get(kind, Color(1.0, 0.16, 0.055))
 	material.emission = material.albedo_color
@@ -499,6 +500,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_2: player.use_prosthetic("firecracker")
 			KEY_3: player.use_prosthetic("axe")
 			KEY_4: player.use_prosthetic("umbrella")
+			KEY_R: player.begin_lightning_reversal()
+			KEY_U: player.upgrade_next_prosthetic()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:

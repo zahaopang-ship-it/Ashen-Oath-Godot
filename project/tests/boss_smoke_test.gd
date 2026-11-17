@@ -35,7 +35,7 @@ func _run() -> void:
 	boss.vitality = 230.0
 	boss._physics_process(0.016)
 	_check(boss.boss_phase == 2 and phases == [2], "vitality threshold triggers phase transition once")
-	_check(boss.get_phase_pattern() == ["sweep", "grab", "thrust", "ashen_rend"], "phase two switches to sweep, grab, thrust and signature finisher sequence")
+	_check(boss.get_phase_pattern() == ["sweep", "grab", "thrust", "lightning", "ashen_rend"], "phase two switches to sweep, grab, thrust and signature finisher sequence")
 	_check(boss.move_speed > 4.4 and boss.attack_range > 2.5, "phase two increases aggression and reach")
 	boss.vitality = 50.0
 	boss._physics_process(0.016)

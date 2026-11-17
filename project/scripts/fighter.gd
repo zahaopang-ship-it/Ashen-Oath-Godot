@@ -123,23 +123,28 @@ var _distraction_active := false
 var _distraction_timer := 0.0
 var prosthetic_pose := ""
 var prosthetic_pose_timer := 0.0
+var lightning_reversal_timer := 0.0
+var prosthetic_upgrade_points := 3
+var upgrade_selection_index := 0
+var prosthetic_upgrades := {"shuriken": 0, "firecracker": 0, "axe": 0, "umbrella": 0}
 
 const WINDUP_TIME := 0.32
 const ACTIVE_TIME := 0.10
 const RECOVERY_TIME := 0.34
 const POSTURE_BREAK_TIME := 1.35
 const HIT_FLASH_COLOR := Color(1.0, 0.72, 0.58)
-const ATTACK_KINDS := ["slash", "thrust", "sweep", "heavy", "grab", "ashen_rend"]
-const ATTACK_DAMAGE := {"slash": 22.0, "thrust": 27.0, "sweep": 18.0, "heavy": 34.0, "grab": 30.0, "ashen_rend": 46.0}
-const ATTACK_POSTURE := {"slash": 30.0, "thrust": 36.0, "sweep": 24.0, "heavy": 46.0, "grab": 12.0, "ashen_rend": 58.0}
-const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0.62, "grab": 0.72, "ashen_rend": 0.92}
+const ATTACK_KINDS := ["slash", "thrust", "sweep", "heavy", "grab", "ashen_rend", "lightning"]
+const ATTACK_DAMAGE := {"slash": 22.0, "thrust": 27.0, "sweep": 18.0, "heavy": 34.0, "grab": 30.0, "ashen_rend": 46.0, "lightning": 38.0}
+const ATTACK_POSTURE := {"slash": 30.0, "thrust": 36.0, "sweep": 24.0, "heavy": 46.0, "grab": 12.0, "ashen_rend": 58.0, "lightning": 42.0}
+const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0.62, "grab": 0.72, "ashen_rend": 0.92, "lightning": 1.05}
 const ATTACK_HITBOX := {
 	"slash": Vector3(0.95, 1.25, 1.65),
 	"thrust": Vector3(0.52, 1.10, 2.10),
 	"sweep": Vector3(1.45, 0.62, 1.55),
 	"heavy": Vector3(1.00, 1.40, 1.90),
 	"grab": Vector3(0.85, 1.15, 1.45),
-	"ashen_rend": Vector3(1.65, 1.45, 2.35)
+	"ashen_rend": Vector3(1.65, 1.45, 2.35),
+	"lightning": Vector3(1.35, 1.55, 2.2)
 }
 const ATTACK_BUFFER_WINDOW := 0.58
 const COMBO_RESET_TIME := 0.95
@@ -167,6 +172,7 @@ func _physics_process(delta: float) -> void:
 		return
 	deflect_timer = maxf(0.0, deflect_timer - delta)
 	prosthetic_cooldown = maxf(0.0, prosthetic_cooldown - delta)
+	lightning_reversal_timer = maxf(0.0, lightning_reversal_timer - delta)
 	prosthetic_pose_timer = maxf(0.0, prosthetic_pose_timer - delta)
 	if prosthetic_pose_timer <= 0.0:
 		prosthetic_pose = ""
@@ -1063,8 +1069,12 @@ func emit_noise(noise_position: Vector3, radius: float) -> void:
 func use_prosthetic(tool: String) -> bool:
 	if not is_player or is_dead or state != CombatState.FREE or is_blocking or prosthetic_cooldown > 0.0:
 		return false
-	var costs := {"shuriken": 18.0, "firecracker": 28.0, "axe": 32.0, "umbrella": 24.0}
-	if not costs.has(tool) or prosthetic_energy < float(costs[tool]):
+	var base_costs := {"shuriken": 18.0, "firecracker": 28.0, "axe": 32.0, "umbrella": 24.0}
+	if not base_costs.has(tool):
+		return false
+	var level: int = int(prosthetic_upgrades[tool])
+	var cost := maxf(8.0, float(base_costs[tool]) * (1.0 - 0.08 * float(level)))
+	if prosthetic_energy < cost:
 		return false
 	var succeeded := false
 	match tool:
@@ -1081,12 +1091,12 @@ func use_prosthetic(tool: String) -> bool:
 			if succeeded:
 				prosthetic_cooldown = 0.72
 		"umbrella":
-			umbrella_timer = 1.25
+			umbrella_timer = 1.25 + 0.22 * float(prosthetic_upgrades["umbrella"])
 			is_blocking = true
 			succeeded = true
 			prosthetic_cooldown = 0.45
 	if succeeded:
-		prosthetic_energy -= float(costs[tool])
+		prosthetic_energy -= cost
 		prosthetic_pose = tool
 		prosthetic_pose_timer = 0.34
 	return succeeded
@@ -1108,7 +1118,8 @@ func _use_shuriken() -> bool:
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty() and hit.get("collider") != target:
 		return false
-	target.receive_strike(12.0, 20.0, self, "thrust")
+	var level: int = int(prosthetic_upgrades["shuriken"])
+	target.receive_strike(12.0 + 3.0 * level, 20.0 + 4.0 * level, self, "thrust")
 	var projectile := MeshInstance3D.new()
 	projectile.name = "ProstheticShuriken"
 	var blade := SphereMesh.new()
@@ -1134,7 +1145,8 @@ func _use_firecracker() -> void:
 	for listener in get_tree().get_nodes_in_group("stealth_guards"):
 		if not is_instance_valid(listener):
 			continue
-		if listener.global_position.distance_to(burst_position) > 10.0:
+		var firecracker_level: int = int(prosthetic_upgrades["firecracker"])
+		if listener.global_position.distance_to(burst_position) > 10.0 + 1.5 * float(firecracker_level):
 			continue
 		if listener.has_method("receive_distraction"):
 			listener.receive_distraction(burst_position)
@@ -1173,7 +1185,80 @@ func _use_axe() -> bool:
 	if -global_transform.basis.z.dot(offset.normalized()) < 0.35:
 		return false
 	if target.has_method("receive_strike"):
-		target.receive_strike(18.0, 52.0, self, "heavy")
+		var axe_level: int = int(prosthetic_upgrades["axe"])
+		target.receive_strike(18.0 + 5.0 * axe_level, 52.0 + 8.0 * axe_level, self, "heavy")
+	return true
+
+func begin_lightning_reversal() -> bool:
+	if not is_player or is_dead or state != CombatState.FREE or velocity.y < 0.5 or lightning_reversal_timer > 0.0:
+		return false
+	lightning_reversal_timer = 0.85
+	combat_feedback.emit("lightning_ready", self)
+	return true
+
+func receive_lightning_reversal(defender: Node3D) -> void:
+	if is_dead or not is_instance_valid(defender):
+		return
+	_spawn_lightning_arc(defender, Color(0.24, 0.82, 1.0))
+	posture += 82.0
+	_check_posture_break()
+	if state != CombatState.POSTURE_BROKEN:
+		state = CombatState.HITSTUN
+		hit_reaction_kind = "heavy"
+		hit_reaction_duration = 0.72
+		hit_reaction_timer = 0.72
+	combat_feedback.emit("lightning_reversed", self)
+
+func _spawn_lightning_arc(other: Node3D, tint: Color) -> void:
+	if not is_instance_valid(other):
+		return
+	var start := global_position + Vector3.UP * 1.2
+	var finish := other.global_position + Vector3.UP * 1.2
+	var direction := finish - start
+	var length := direction.length()
+	if length < 0.1:
+		return
+	var beam := MeshInstance3D.new()
+	beam.name = "LightningArc"
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.045
+	mesh.bottom_radius = 0.075
+	mesh.height = length
+	beam.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = tint
+	material.emission_enabled = true
+	material.emission = tint
+	material.emission_energy_multiplier = 4.0
+	beam.material_override = material
+	var scene_root: Node = get_tree().current_scene if is_instance_valid(get_tree().current_scene) else get_tree().root
+	scene_root.add_child(beam)
+	beam.global_position = (start + finish) * 0.5
+	var axis := Vector3.UP.cross(direction.normalized())
+	if axis.length_squared() > 0.001:
+		beam.global_basis = Basis(axis.normalized(), Vector3.UP.angle_to(direction.normalized()))
+	var tween := get_tree().create_tween()
+	tween.tween_property(material, "albedo_color:a", 0.0, 0.16)
+	tween.tween_callback(beam.queue_free)
+
+func upgrade_next_prosthetic() -> bool:
+	var tools := ["shuriken", "firecracker", "axe", "umbrella"]
+	for offset in range(tools.size()):
+		var index := (upgrade_selection_index + offset) % tools.size()
+		var tool: String = tools[index]
+		if upgrade_prosthetic(tool):
+			upgrade_selection_index = (index + 1) % tools.size()
+			return true
+	return false
+
+func upgrade_prosthetic(tool: String) -> bool:
+	if not is_player or is_dead or state != CombatState.FREE or prosthetic_upgrade_points <= 0 or not prosthetic_upgrades.has(tool):
+		return false
+	if int(prosthetic_upgrades[tool]) >= 3:
+		return false
+	prosthetic_upgrades[tool] = int(prosthetic_upgrades[tool]) + 1
+	prosthetic_upgrade_points -= 1
 	return true
 
 func receive_distraction(noise_position: Vector3) -> void:
@@ -1237,6 +1322,12 @@ func receive_strike(damage: float, posture_damage: float, attacker: Node3D, inco
 		if is_dodging:
 			combat_feedback.emit("evaded", self)
 		return "evaded"
+	if incoming_kind == "lightning" and is_player and lightning_reversal_timer > 0.0 and velocity.y > 0.35:
+		lightning_reversal_timer = 0.0
+		if is_instance_valid(attacker) and attacker.has_method("receive_lightning_reversal"):
+			attacker.receive_lightning_reversal(self)
+		combat_feedback.emit("lightning_reversed", self)
+		return "lightning_reversed"
 	if incoming_kind == "thrust" and is_mikiri_countering:
 		is_mikiri_countering = false
 		counter_timer = 0.0
