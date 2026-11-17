@@ -7,6 +7,9 @@ var camera: Camera3D
 var arena_radius := 13.0
 var camera_yaw := 0.0
 var camera_pitch := -0.22
+var camera_impulse := 0.0
+var telegraph_marker: MeshInstance3D
+var telegraph_phase := 0.0
 
 func _ready() -> void:
 	_setup_world()
@@ -14,6 +17,10 @@ func _ready() -> void:
 	enemy = _make_fighter("Ashigaru", Vector3(0, 0, -3), false)
 	player.target = enemy
 	enemy.target = player
+	enemy.attack_phase_changed.connect(_on_enemy_attack_phase)
+	enemy.attack_hit.connect(_on_enemy_attack_hit)
+	player.attack_hit.connect(_on_player_attack_hit)
+	_create_telegraph_marker()
 	camera = Camera3D.new()
 	camera.name = "CombatCamera"
 	camera.current = true
@@ -101,12 +108,48 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	body.add_child(blade)
 	return body
 
+func _create_telegraph_marker() -> void:
+	telegraph_marker = MeshInstance3D.new()
+	telegraph_marker.name = "EnemyAttackTelegraph"
+	var orb := SphereMesh.new()
+	orb.radius = 0.22
+	orb.height = 0.44
+	telegraph_marker.mesh = orb
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(1.0, 0.16, 0.055)
+	material.emission_enabled = true
+	material.emission = Color(1.0, 0.055, 0.015)
+	material.emission_energy_multiplier = 2.2
+	telegraph_marker.material_override = material
+	telegraph_marker.position = Vector3(0, 2.65, 0)
+	telegraph_marker.visible = false
+	enemy.add_child(telegraph_marker)
+
+func _on_enemy_attack_phase(phase: String) -> void:
+	if not is_instance_valid(telegraph_marker):
+		return
+	telegraph_marker.visible = phase == "windup"
+	if phase == "windup":
+		telegraph_phase = 0.0
+
+func _on_enemy_attack_hit(_target: Node) -> void:
+	camera_impulse = maxf(camera_impulse, 0.22)
+
+func _on_player_attack_hit(_target: Node) -> void:
+	camera_impulse = maxf(camera_impulse, 0.13)
+
 func _process(delta: float) -> void:
 	if not is_instance_valid(player) or not is_instance_valid(enemy):
 		return
 	var focus := player.global_position.lerp(enemy.global_position, 0.28)
 	var desired := focus + Vector3(sin(camera_yaw) * 7.0, 4.2 + camera_pitch * 3.0, cos(camera_yaw) * 7.0)
-	camera.global_position = camera.global_position.lerp(desired, 1.0 - exp(-5.0 * delta))
+	camera_impulse = move_toward(camera_impulse, 0.0, delta * 0.9)
+	telegraph_phase += delta
+	var shake := Vector3(sin(telegraph_phase * 53.0), cos(telegraph_phase * 67.0), 0.0) * camera_impulse
+	camera.global_position = camera.global_position.lerp(desired + shake, 1.0 - exp(-5.0 * delta))
+	if is_instance_valid(telegraph_marker) and telegraph_marker.visible:
+		var pulse := 1.0 + 0.22 * sin(telegraph_phase * 15.0)
+		telegraph_marker.scale = Vector3.ONE * pulse
 	camera.look_at(focus + Vector3(0, 1.0, 0), Vector3.UP)
 
 func _unhandled_input(event: InputEvent) -> void:

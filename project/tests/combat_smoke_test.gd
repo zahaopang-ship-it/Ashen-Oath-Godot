@@ -60,7 +60,17 @@ func _run() -> void:
 	striker.call("_resolve_attack_hit")
 	_check(is_equal_approx(victim.vitality, health_after), "one attack cannot hit same target twice")
 
-	print("Combat tests: ", 16 - failures.size(), "/16 passed")
+	var doomed := _new_fighter("Doomed", Vector3.ZERO)
+	doomed.receive_strike(150.0, 0.0, attacker)
+	_check(doomed.is_dead and doomed.state == 5, "lethal strike enters terminal dead state")
+	_check(not doomed.begin_deflect(), "dead fighter cannot deflect")
+
+	var dodger := _new_fighter("Dodger", Vector3.ZERO)
+	dodger.dodge()
+	_check(dodger.is_dodging, "dodge grants an active evasion window")
+	_check(dodger.receive_strike(20.0, 20.0, attacker) == "evaded", "dodge window evades incoming strike")
+
+	print("Combat tests: ", 21 - failures.size(), "/21 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:

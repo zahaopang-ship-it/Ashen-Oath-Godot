@@ -1,5 +1,6 @@
 extends CharacterBody3D
 signal telegraph_started(kind: String)
+signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
 signal posture_broken
 signal died
@@ -74,13 +75,16 @@ func _update_attack_state(delta: float) -> void:
 	attack_timer -= delta
 	if state == CombatState.WINDUP and attack_timer <= 0.0:
 		state = CombatState.ACTIVE
+		attack_phase_changed.emit("active")
 		attack_timer = ACTIVE_TIME
 		_resolve_attack_hit()
 	elif state == CombatState.ACTIVE and attack_timer <= 0.0:
 		state = CombatState.RECOVERY
+		attack_phase_changed.emit("recovery")
 		attack_timer = RECOVERY_TIME
 	elif state == CombatState.RECOVERY and attack_timer <= 0.0:
 		state = CombatState.FREE
+		attack_phase_changed.emit("finished")
 
 func _player_update(delta: float) -> void:
 	if state != CombatState.FREE:
@@ -135,6 +139,7 @@ func start_attack(kind: String = "slash") -> bool:
 	state = CombatState.WINDUP
 	attack_timer = WINDUP_TIME
 	telegraph_started.emit(kind)
+	attack_phase_changed.emit("windup")
 	return true
 
 func _resolve_attack_hit() -> void:
@@ -179,6 +184,7 @@ func _check_posture_break() -> void:
 	posture = clampf(posture, 0.0, max_posture)
 	if posture >= max_posture and state != CombatState.POSTURE_BROKEN:
 		state = CombatState.POSTURE_BROKEN
+		attack_phase_changed.emit("interrupted")
 		posture_break_timer = POSTURE_BREAK_TIME
 		is_blocking = false
 		deflect_timer = 0.0
@@ -188,6 +194,7 @@ func _check_posture_break() -> void:
 func _die() -> void:
 	is_dead = true
 	state = CombatState.DEAD
+	attack_phase_changed.emit("finished")
 	is_blocking = false
 	velocity = Vector3.ZERO
 	died.emit()
@@ -217,6 +224,7 @@ func dodge() -> void:
 	if is_dead or state != CombatState.FREE or is_dodging:
 		return
 	dodge_timer = 0.38
+	is_dodging = true
 	var dir := global_transform.basis.x * input_move.x + (-global_transform.basis.z) * -input_move.y
 	if dir.length() < 0.1:
 		dir = -global_transform.basis.z

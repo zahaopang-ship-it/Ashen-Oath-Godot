@@ -74,9 +74,10 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - [x] Deflect window (200 ms), post-deflect lockout, held-guard fallback, and posture pressure.
 - [x] Posture threshold enters a timed broken state; vitality-dependent posture recovery.
 - [x] Independent touch pointer tracking for movement, camera, and action-button fingers; keyboard debug controls (WASD/J/K/L/Space).
-- [x] Headless combat logic suite: 16 assertions passing.
+- [x] Headless combat logic suite: 21 assertions passing.
 - [ ] Validate simultaneous touch on a physical Android device; headless tests cannot prove touch-driver behavior.
-- [ ] Add dedicated telegraph visuals/audio, hit reactions, and broader automated movement/input tests.
+- [x] Add a visible pulsing enemy windup marker and light camera impact feedback on confirmed hits.
+- [ ] Add spatial telegraph audio, hit reactions, and broader automated movement/input tests.
 - Gate: test matrix for all input combinations and combat outcomes; do not close M1 until physical multitouch is exercised.
 
 ### M2 — Combat depth
@@ -107,6 +108,6 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 
 ## Current known limitations
 - Fighters are still procedural capsules and the arena is a greybox; no production character/environment assets or animation have been integrated.
-- Combat M1 is still a prototype: no real animation-driven hitboxes, hit reactions, audio/VFX, boss, or Android export yet.
+- Combat M1 is still a prototype: the telegraph is a simple emissive marker, camera feedback is a lightweight impulse, and there are no animation-driven hitboxes, hit reactions, spatial audio, boss, or Android export yet.
 - The Linux container has no graphical desktop or physical touchscreen; Android rendering, safe areas, and true simultaneous multitouch remain unverified.
 - GitHub repository: https://github.com/zahaopang-ship-it/Ashen-Oath-Godot (private), branch `main`. Push every stable checkpoint here; never use an unrelated repository.
