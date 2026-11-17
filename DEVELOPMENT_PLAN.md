@@ -68,14 +68,16 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Initial vitality/posture, deflect/block/dodge and simple enemy behavior.
 - Gate: headless import and scene smoke test pass; fix every parser/runtime error before M1.
 
-### M1 — Combat vertical slice
-- Reliable mobile joystick and independent camera drag.
-- Simultaneous touch testing for movement + deflect + attack.
-- Attack hitboxes and telegraph timing.
-- Deflect timing and anti-spam behavior.
-- Posture break and meaningful recovery.
-- Keyboard/gamepad debug mappings for repeatable testing.
-- Gate: test matrix for all input combinations and combat outcomes.
+### M1 — Combat vertical slice (in progress)
+- [x] Combat state flow: windup, active, recovery, posture-broken, dead.
+- [x] Single-hit attack resolution with range/facing validation and readable windup state.
+- [x] Deflect window (200 ms), post-deflect lockout, held-guard fallback, and posture pressure.
+- [x] Posture threshold enters a timed broken state; vitality-dependent posture recovery.
+- [x] Independent touch pointer tracking for movement, camera, and action-button fingers; keyboard debug controls (WASD/J/K/L/Space).
+- [x] Headless combat logic suite: 16 assertions passing.
+- [ ] Validate simultaneous touch on a physical Android device; headless tests cannot prove touch-driver behavior.
+- [ ] Add dedicated telegraph visuals/audio, hit reactions, and broader automated movement/input tests.
+- Gate: test matrix for all input combinations and combat outcomes; do not close M1 until physical multitouch is exercised.
 
 ### M2 — Combat depth
 - Attack chains, input buffering, Mikiri, sweep jump/stomp, dodge/grab.
@@ -104,7 +106,7 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Keep APK/AAB in builds/ with versioned filenames and test notes.
 
 ## Current known limitations
-- Current fighters are procedural capsules and the arena is a greybox. They are for validating mechanics, not final visuals.
-- Animation, real character assets, audio, boss systems, and Android export are not yet implemented.
-- The current remote Linux container has no graphical desktop; editor GUI and physical touchscreen behavior cannot be validated there.
-- Git is initialized locally. The GitHub CLI on this container is not authenticated, and no dedicated Ashen Oath GitHub repository has been created yet. Do not push to an unrelated repository.
+- Fighters are still procedural capsules and the arena is a greybox; no production character/environment assets or animation have been integrated.
+- Combat M1 is still a prototype: no real animation-driven hitboxes, hit reactions, audio/VFX, boss, or Android export yet.
+- The Linux container has no graphical desktop or physical touchscreen; Android rendering, safe areas, and true simultaneous multitouch remain unverified.
+- GitHub repository: https://github.com/zahaopang-ship-it/Ashen-Oath-Godot (private), branch `main`. Push every stable checkpoint here; never use an unrelated repository.

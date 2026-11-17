@@ -1,5 +1,5 @@
 extends Node3D
-const PLAYER_SCRIPT = preload("res://scripts/fighter.gd")
+const FIGHTER_SCRIPT = preload("res://scripts/fighter.gd")
 const HUD_SCRIPT = preload("res://scripts/touch_hud.gd")
 var player: CharacterBody3D
 var enemy: CharacterBody3D
@@ -12,8 +12,8 @@ func _ready() -> void:
 	_setup_world()
 	player = _make_fighter("Wolf", Vector3(0, 0, 4), true)
 	enemy = _make_fighter("Ashigaru", Vector3(0, 0, -3), false)
-	player.set("target", enemy)
-	enemy.set("target", player)
+	player.target = enemy
+	enemy.target = player
 	camera = Camera3D.new()
 	camera.name = "CombatCamera"
 	camera.current = true
@@ -21,7 +21,7 @@ func _ready() -> void:
 	add_child(camera)
 	var hud := CanvasLayer.new()
 	hud.set_script(HUD_SCRIPT)
-	hud.set("game", self)
+	hud.game = self
 	add_child(hud)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -28, 0)
@@ -54,17 +54,13 @@ func _setup_world() -> void:
 		for z in [-9.0, 9.0]:
 			_make_tree(Vector3(x, 0, z))
 
-func _make_fighter(label: String, pos: Vector3, is_player: bool) -> CharacterBody3D:
+func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> CharacterBody3D:
 	var body := CharacterBody3D.new()
 	body.name = label
 	body.position = pos
-	body.set_script(PLAYER_SCRIPT)
-	body.set("is_player", is_player)
-	body.set("display_name", label)
-	body.set("max_vitality", 100.0)
-	body.set("vitality", 100.0)
-	body.set("max_posture", 100.0)
-	body.set("posture", 0.0)
+	body.set_script(FIGHTER_SCRIPT)
+	body.is_player = player_controlled
+	body.display_name = label
 	add_child(body)
 	var collision := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
@@ -80,7 +76,7 @@ func _make_fighter(label: String, pos: Vector3, is_player: bool) -> CharacterBod
 	mesh.mesh = capsule_mesh
 	mesh.position.y = 0.9
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.16, 0.24, 0.31) if is_player else Color(0.48, 0.16, 0.12)
+	mat.albedo_color = Color(0.16, 0.24, 0.31) if player_controlled else Color(0.48, 0.16, 0.12)
 	mat.roughness = 0.82
 	mesh.material_override = mat
 	body.add_child(mesh)
@@ -112,6 +108,27 @@ func _process(delta: float) -> void:
 	var desired := focus + Vector3(sin(camera_yaw) * 7.0, 4.2 + camera_pitch * 3.0, cos(camera_yaw) * 7.0)
 	camera.global_position = camera.global_position.lerp(desired, 1.0 - exp(-5.0 * delta))
 	camera.look_at(focus + Vector3(0, 1.0, 0), Vector3.UP)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not player:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_J: player.player_attack()
+			KEY_K: player.begin_deflect()
+			KEY_L: player.begin_block()
+			KEY_SPACE: player.dodge()
+			KEY_KP_1: player.end_deflect()
+			KEY_KP_2: player.end_block()
+	if event is InputEventKey and not event.pressed:
+		if event.keycode == KEY_K: player.end_deflect()
+		if event.keycode == KEY_L: player.end_block()
+	var move := Vector2.ZERO
+	if Input.is_key_pressed(KEY_A): move.x -= 1.0
+	if Input.is_key_pressed(KEY_D): move.x += 1.0
+	if Input.is_key_pressed(KEY_W): move.y -= 1.0
+	if Input.is_key_pressed(KEY_S): move.y += 1.0
+	player.input_move = move.normalized() if move.length() > 1.0 else move
 
 func rotate_camera(delta_x: float, delta_y: float) -> void:
 	camera_yaw -= delta_x * 0.004
