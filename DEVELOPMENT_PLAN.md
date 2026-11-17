@@ -74,7 +74,7 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - [x] Deflect window (200 ms), post-deflect lockout, held-guard fallback, and posture pressure.
 - [x] Posture threshold enters a timed broken state; vitality-dependent posture recovery.
 - [x] Independent touch pointer tracking for movement, camera, and action-button fingers; keyboard debug controls (WASD/J/K/L/Space).
-- [x] Headless combat logic suite: 39 assertions passing (including procedural pose-state checks).
+- [x] Headless combat logic suite: 50 assertions passing (including attack hit-volume and combo-buffer checks).
 - [ ] Validate simultaneous touch on a physical Android device; headless tests cannot prove touch-driver behavior.
 - [x] Add a visible pulsing enemy windup marker and light camera impact feedback on confirmed hits.
 - [x] Add short directional hitstun/recoil and a temporary material flash for unblocked hits.
@@ -84,7 +84,9 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 ### M2 — Combat depth
 - [x] Attack classes and counter windows: slash, thrust/Mikiri, sweep/jump, and heavy.
 - [x] Procedural combat pose foundation: attack anticipation/follow-through, guard, hitstun, posture break, and death.
-- [ ] Attack chains, input buffering, stomp, dodge/grab.
+- [x] Three-step slash/slash/heavy combo with a 0.58-second buffered input window.
+- [x] Attack-specific forward hit volumes evaluated during active frames (narrow thrust, wide sweep, standard slash, heavy).
+- [ ] Stomp and dodge/grab.
 - [ ] Hitstop, camera impulse polish, and impact audio.
 - Enemy archetypes and combat state machine.
 - Gate: no stuck states; each attack type has a valid counter and punish path.
@@ -133,3 +135,13 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added guard, dodge, Mikiri, sweep-jump, hitstun, posture-break, death, and idle pose responses.
 - Added headless assertions for heavy anticipation, active follow-through, guard pose, hit reaction, and death collapse pose.
 - This is procedural pose animation on primitive meshes, not a skeletal animation asset or a replacement for authored animation clips.
+
+
+## M2 — Timed hit volumes and buffered combo chain
+- Replaced the simple distance/facing check with attack-specific local-space hit volumes evaluated during the active attack window.
+- Slash/heavy use broad forward volumes, thrust uses a narrow and longer volume, and sweep uses a low wide volume.
+- Attack hits are resolved during active frames and remain single-hit per attack token.
+- Added a three-stage player chain (slash → slash → heavy) and a 0.58-second input buffer consumed when recovery ends.
+- Buffered inputs expire cleanly; the combo chain resets after 0.95 seconds without continuation.
+- Added headless tests for rear rejection, thrust lateral rejection, sweep lateral coverage, combo buffering, finisher, and expiry.
+- Hit volumes are currently deterministic local-space gameplay volumes, not weapon-bone swept collision or animation-authored Area3D hitboxes.

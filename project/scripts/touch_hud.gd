@@ -66,7 +66,7 @@ func _build_ui() -> void:
 	_register_action("MIKIRI", Vector2(-275, -70), "mikiri", Color(0.58, 0.25, 0.12))
 	_register_action("JUMP", Vector2(-195, -70), "jump", Color(0.18, 0.42, 0.55))
 	var hint := Label.new()
-	hint.text = "WASD move  J attack  K deflect  L block  Space dodge  I Mikiri  O jump"
+	hint.text = "WASD move  J combo  K deflect  L block  Space dodge  I Mikiri  O jump"
 	hint.position = Vector2(28, 132)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))

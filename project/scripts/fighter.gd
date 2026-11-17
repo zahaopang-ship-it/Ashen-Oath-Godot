@@ -47,6 +47,10 @@ var is_sweep_evading := false
 var counter_timer := 0.0
 var _attack_hit_applied := false
 var _attack_token := 0
+var buffered_attack_kind := ""
+var attack_buffer_timer := 0.0
+var combo_step := 0
+var combo_reset_timer := 0.0
 
 const WINDUP_TIME := 0.32
 const ACTIVE_TIME := 0.10
@@ -57,6 +61,14 @@ const ATTACK_KINDS := ["slash", "thrust", "sweep", "heavy"]
 const ATTACK_DAMAGE := {"slash": 22.0, "thrust": 27.0, "sweep": 18.0, "heavy": 34.0}
 const ATTACK_POSTURE := {"slash": 30.0, "thrust": 36.0, "sweep": 24.0, "heavy": 46.0}
 const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0.62}
+const ATTACK_HITBOX := {
+	"slash": Vector3(0.95, 1.25, 1.65),
+	"thrust": Vector3(0.52, 1.10, 2.10),
+	"sweep": Vector3(1.45, 0.62, 1.55),
+	"heavy": Vector3(1.00, 1.40, 1.90)
+}
+const ATTACK_BUFFER_WINDOW := 0.58
+const COMBO_RESET_TIME := 0.95
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
@@ -67,6 +79,12 @@ func _physics_process(delta: float) -> void:
 	deflect_cooldown = maxf(0.0, deflect_cooldown - delta)
 	dodge_timer = maxf(0.0, dodge_timer - delta)
 	counter_timer = maxf(0.0, counter_timer - delta)
+	attack_buffer_timer = maxf(0.0, attack_buffer_timer - delta)
+	if attack_buffer_timer <= 0.0:
+		buffered_attack_kind = ""
+	combo_reset_timer = maxf(0.0, combo_reset_timer - delta)
+	if combo_reset_timer <= 0.0 and state == CombatState.FREE and buffered_attack_kind.is_empty():
+		combo_step = 0
 	if counter_timer <= 0.0:
 		is_mikiri_countering = false
 		is_sweep_evading = false
@@ -101,13 +119,20 @@ func _update_attack_state(delta: float) -> void:
 		attack_phase_changed.emit("active")
 		attack_timer = ACTIVE_TIME
 		_resolve_attack_hit()
-	elif state == CombatState.ACTIVE and attack_timer <= 0.0:
-		state = CombatState.RECOVERY
-		attack_phase_changed.emit("recovery")
-		attack_timer = RECOVERY_TIME
+	elif state == CombatState.ACTIVE:
+		_resolve_attack_hit()
+		if attack_timer <= 0.0:
+			state = CombatState.RECOVERY
+			attack_phase_changed.emit("recovery")
+			attack_timer = RECOVERY_TIME
 	elif state == CombatState.RECOVERY and attack_timer <= 0.0:
 		state = CombatState.FREE
 		attack_phase_changed.emit("finished")
+		if is_player and not buffered_attack_kind.is_empty() and attack_buffer_timer > 0.0:
+			var next_kind := buffered_attack_kind
+			buffered_attack_kind = ""
+			attack_buffer_timer = 0.0
+			start_attack(next_kind)
 
 func _update_hit_reaction(delta: float) -> void:
 	hit_reaction_timer = maxf(0.0, hit_reaction_timer - delta)
@@ -278,15 +303,18 @@ func start_attack(kind: String = "slash") -> bool:
 	attack_phase_changed.emit("windup")
 	return true
 
+func _is_target_inside_attack_hitbox(candidate: Node3D) -> bool:
+	if not is_instance_valid(candidate):
+		return false
+	var local_center: Vector3 = global_transform.affine_inverse() * (candidate.global_position + Vector3.UP * 0.9)
+	var half_extents: Vector3 = ATTACK_HITBOX.get(attack_kind, ATTACK_HITBOX["slash"])
+	var vertical_center := 0.45 if attack_kind == "sweep" else 0.9
+	return absf(local_center.x) <= half_extents.x and absf(local_center.y - vertical_center) <= half_extents.y and local_center.z <= -0.22 and local_center.z >= -half_extents.z
+
 func _resolve_attack_hit() -> void:
 	if _attack_hit_applied or not is_instance_valid(target) or target.is_dead:
 		return
-	var offset := target.global_position - global_position
-	offset.y = 0.0
-	if offset.length() > attack_range:
-		return
-	var facing := -global_transform.basis.z
-	if offset.length_squared() > 0.001 and facing.normalized().dot(offset.normalized()) < 0.15:
+	if not _is_target_inside_attack_hitbox(target):
 		return
 	_attack_hit_applied = true
 	target.receive_strike(float(ATTACK_DAMAGE[attack_kind]), float(ATTACK_POSTURE[attack_kind]), self, attack_kind)
@@ -401,8 +429,25 @@ func dodge() -> void:
 	velocity.x = dir.x * 10.0
 	velocity.z = dir.z * 10.0
 
+func request_player_attack() -> bool:
+	if is_dead or not is_player:
+		return false
+	if combo_reset_timer <= 0.0 and state == CombatState.FREE:
+		combo_step = 0
+	var chain := ["slash", "slash", "heavy"]
+	var requested_kind: String = chain[mini(combo_step, chain.size() - 1)]
+	combo_step = (combo_step + 1) % chain.size()
+	combo_reset_timer = COMBO_RESET_TIME
+	if state == CombatState.FREE and not is_blocking:
+		return start_attack(requested_kind)
+	if state in [CombatState.WINDUP, CombatState.ACTIVE, CombatState.RECOVERY]:
+		buffered_attack_kind = requested_kind
+		attack_buffer_timer = ATTACK_BUFFER_WINDOW
+		return true
+	return false
+
 func player_attack() -> void:
-	start_attack("slash")
+	request_player_attack()
 
 func get_vitality_ratio() -> float:
 	return vitality / maxf(1.0, max_vitality)

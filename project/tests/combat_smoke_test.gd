@@ -55,10 +55,31 @@ func _run() -> void:
 	_check(striker.state == 1, "attack enters readable windup")
 	striker.call("_update_attack_state", 0.33)
 	_check(striker.state == 2, "windup transitions to active frame")
-	_check(victim.vitality < 100.0, "active attack resolves hit within range")
+	_check(victim.vitality < 100.0, "active attack hitbox resolves a target in front")
 	var health_after: float = victim.vitality
 	striker.call("_resolve_attack_hit")
 	_check(is_equal_approx(victim.vitality, health_after), "one attack cannot hit same target twice")
+
+	var rear_striker := _new_fighter("RearStriker", Vector3.ZERO)
+	var rear_target := _new_fighter("RearTarget", Vector3(0, 0, 1.0))
+	rear_striker.target = rear_target
+	rear_striker.start_attack("slash")
+	rear_striker.call("_update_attack_state", 0.33)
+	_check(is_equal_approx(rear_target.vitality, 100.0), "attack hitbox does not hit targets behind the fighter")
+
+	var thrust_striker := _new_fighter("ThrustStriker", Vector3.ZERO)
+	var side_target := _new_fighter("SideTarget", Vector3(1.0, 0, -1.0))
+	thrust_striker.target = side_target
+	thrust_striker.start_attack("thrust")
+	thrust_striker.call("_update_attack_state", 0.49)
+	_check(is_equal_approx(side_target.vitality, 100.0), "narrow thrust hitbox rejects a lateral target")
+
+	var sweep_striker := _new_fighter("SweepStriker", Vector3.ZERO)
+	var sweep_target := _new_fighter("SweepTarget", Vector3(1.1, 0, -1.0))
+	sweep_striker.target = sweep_target
+	sweep_striker.start_attack("sweep")
+	sweep_striker.call("_update_attack_state", 0.43)
+	_check(sweep_target.vitality < 100.0, "wide sweep hitbox catches a lateral target")
 
 	var doomed := _new_fighter("Doomed", Vector3.ZERO)
 	doomed.receive_strike(150.0, 0.0, attacker)
@@ -119,12 +140,34 @@ func _run() -> void:
 	animated.call("_update_combat_animation", 0.05)
 	_check(upper.rotation.x > 0.05, "death state drives a collapse pose")
 
+	var combo := _new_fighter("ComboPlayer", Vector3.ZERO)
+	combo.is_player = true
+	_check(combo.request_player_attack(), "first combo input starts a slash")
+	_check(combo.attack_kind == "slash", "combo opener uses slash")
+	_check(combo.request_player_attack(), "second combo input is buffered during windup")
+	_check(combo.buffered_attack_kind == "slash", "second combo stage is queued")
+	combo.state = 3
+	combo.attack_timer = 0.01
+	combo.call("_update_attack_state", 0.02)
+	_check(combo.state == 1 and combo.attack_kind == "slash", "buffered slash starts immediately after recovery")
+	_check(combo.request_player_attack(), "third combo input is buffered")
+	_check(combo.buffered_attack_kind == "heavy", "third combo stage queues a heavy finisher")
+	combo.state = 3
+	combo.attack_timer = 0.01
+	combo.call("_update_attack_state", 0.02)
+	_check(combo.attack_kind == "heavy" and combo.state == 1, "heavy finisher follows the second slash")
+	combo.state = 1
+	combo.buffered_attack_kind = "slash"
+	combo.attack_buffer_timer = 0.1
+	combo.call("_physics_process", 0.2)
+	_check(combo.buffered_attack_kind.is_empty(), "expired input buffer is discarded")
+
 	var dodger := _new_fighter("Dodger", Vector3.ZERO)
 	dodger.dodge()
 	_check(dodger.is_dodging, "dodge grants an active evasion window")
 	_check(dodger.receive_strike(20.0, 20.0, attacker) == "evaded", "dodge window evades incoming strike")
 
-	print("Combat tests: ", 39 - failures.size(), "/39 passed")
+	print("Combat tests: ", 50 - failures.size(), "/50 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:
