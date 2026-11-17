@@ -445,7 +445,12 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(player) or not is_instance_valid(enemy):
 		return
 	var focus := player.global_position.lerp(enemy.global_position, 0.28)
-	var desired := focus + Vector3(sin(camera_yaw) * 7.0, 4.2 + camera_pitch * 3.0, cos(camera_yaw) * 7.0)
+	var combat_distance := player.global_position.distance_to(enemy.global_position)
+	var camera_distance := clampf(5.8 + combat_distance * 0.34, 6.8, 9.6)
+	if player.is_sprinting:
+		camera_distance += 0.35
+	var camera_height := 3.7 + clampf(combat_distance * 0.055, 0.0, 0.65) + camera_pitch * 2.8
+	var desired := focus + Vector3(sin(camera_yaw) * camera_distance, camera_height, cos(camera_yaw) * camera_distance)
 	camera_impulse = move_toward(camera_impulse, 0.0, delta * 0.9)
 	camera_shake_time += delta
 	camera_shake_strength = move_toward(camera_shake_strength, 0.0, delta * 2.8)

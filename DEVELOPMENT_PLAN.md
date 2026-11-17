@@ -243,3 +243,13 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added regression coverage for thrust/heavy/sweep/grab reaction selection and timing.
 - Headless validation: combat 82/82, boss 22/22, feedback integration 5/5, main-scene smoke passed, script check/editor import passed, and `git diff --check` passed.
 - Limitation: animation remains procedural on primitive meshes; no authored skeletal clips, animation-driven weapon collision, or Android visual/device validation yet.
+
+
+## M4 — Combat footwork, directional dodge, and adaptive camera framing
+- Added acceleration/braking-based player movement instead of immediate full-speed velocity changes.
+- While a target is assigned, the player smoothly maintains target-facing orientation during lateral and backward movement, enabling lock-on strafing without turning away.
+- Dodge now follows the current movement direction; neutral dodge retreats from the assigned target, and the player keeps facing that target during the evade.
+- Camera distance and height now respond to player–enemy spacing, with a slight sprint framing adjustment.
+- Regression coverage: lateral strafe, target-facing while strafing, lateral dodge, target-facing during dodge, and neutral retreat.
+- Headless validation: combat 87/87, boss 22/22, feedback integration 5/5, editor import, main-scene smoke, and `git diff --check` passed.
+- Limitation: touch-screen feel, camera composition, and movement responsiveness still require hands-on Android testing; no device build was produced in this phase.

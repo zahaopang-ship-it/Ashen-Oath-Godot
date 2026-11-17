@@ -11,6 +11,10 @@ enum CombatState { FREE, WINDUP, ACTIVE, RECOVERY, POSTURE_BROKEN, DEAD, HITSTUN
 @export var is_player := false
 @export var display_name := "Fighter"
 @export var move_speed := 5.2
+var movement_acceleration := 30.0
+var movement_braking := 34.0
+var combat_turn_speed := 15.0
+var dodge_speed := 10.0
 @export var max_vitality := 100.0
 @export var vitality := 100.0
 @export var max_posture := 100.0
@@ -441,23 +445,32 @@ func _begin_hit_reaction(attacker: Node3D, incoming_kind: String = "slash") -> v
 
 func _player_update(delta: float) -> void:
 	if state != CombatState.FREE:
-		velocity.x = move_toward(velocity.x, 0.0, 24.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 24.0 * delta)
+		velocity.x = move_toward(velocity.x, 0.0, movement_braking * delta)
+		velocity.z = move_toward(velocity.z, 0.0, movement_braking * delta)
 		return
+	var move_dir := _get_player_move_direction()
+	is_sprinting = sprint_requested or input_move.length() >= 0.82
+	var current_speed := move_speed * (1.42 if is_sprinting else 1.0)
+	var desired_velocity := move_dir * current_speed
+	var accel := movement_acceleration if move_dir.length_squared() > 0.001 else movement_braking
+	velocity.x = move_toward(velocity.x, desired_velocity.x, accel * delta)
+	velocity.z = move_toward(velocity.z, desired_velocity.z, accel * delta)
+	if is_instance_valid(target) and not target.is_dead:
+		var to_target := target.global_position - global_position
+		to_target.y = 0.0
+		if to_target.length_squared() > 0.04:
+			_face_direction(to_target.normalized(), delta, combat_turn_speed)
+	elif move_dir.length_squared() > 0.001:
+		_face_direction(move_dir, delta)
+
+func _get_player_move_direction() -> Vector3:
 	var forward := -global_transform.basis.z
 	var right := global_transform.basis.x
 	var move_dir := right * input_move.x + forward * -input_move.y
-	is_sprinting = sprint_requested or input_move.length() >= 0.82
-	var current_speed := move_speed * (1.42 if is_sprinting else 1.0)
-	if move_dir.length() > 1.0:
+	if move_dir.length_squared() > 1.0:
 		move_dir = move_dir.normalized()
-	if move_dir.length() > 0.08:
-		velocity.x = move_dir.x * current_speed
-		velocity.z = move_dir.z * current_speed
-		_face_direction(move_dir, delta)
-	else:
-		velocity.x = move_toward(velocity.x, 0.0, 24.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 24.0 * delta)
+	return move_dir
+
 
 func _ai_update(delta: float) -> void:
 	if not is_instance_valid(target) or target.is_dead or state != CombatState.FREE:
@@ -489,11 +502,11 @@ func _ai_update(delta: float) -> void:
 				chosen = "grab"
 			start_attack(chosen)
 
-func _face_direction(dir: Vector3, delta: float) -> void:
+func _face_direction(dir: Vector3, delta: float, turn_speed: float = 12.0) -> void:
 	if dir.length_squared() < 0.001:
 		return
 	var target_angle := atan2(-dir.x, -dir.z)
-	rotation.y = lerp_angle(rotation.y, target_angle, 1.0 - exp(-12.0 * delta))
+	rotation.y = lerp_angle(rotation.y, target_angle, 1.0 - exp(-turn_speed * delta))
 
 func start_attack(kind: String = "slash") -> bool:
 	if is_dead or state != CombatState.FREE or is_blocking or not ATTACK_KINDS.has(kind):
@@ -644,12 +657,24 @@ func dodge() -> void:
 	dodge_timer = 0.38
 	dodge_cooldown = 0.52
 	is_dodging = true
-	var dir := global_transform.basis.x * input_move.x + (-global_transform.basis.z) * -input_move.y
-	if dir.length() < 0.1:
+	var dir := _get_player_move_direction()
+	if dir.length_squared() < 0.01:
+		if is_instance_valid(target) and not target.is_dead:
+			dir = global_position - target.global_position
+			dir.y = 0.0
+		else:
+			dir = -global_transform.basis.z
+	if dir.length_squared() < 0.001:
 		dir = -global_transform.basis.z
 	dir = dir.normalized()
-	velocity.x = dir.x * 10.0
-	velocity.z = dir.z * 10.0
+	velocity.x = dir.x * dodge_speed
+	velocity.z = dir.z * dodge_speed
+	if is_instance_valid(target) and not target.is_dead:
+		var face_target := target.global_position - global_position
+		face_target.y = 0.0
+		_face_direction(face_target, 0.12, 18.0)
+	else:
+		_face_direction(dir, 0.12, 18.0)
 
 func request_player_attack() -> bool:
 	if is_dead or not is_player:

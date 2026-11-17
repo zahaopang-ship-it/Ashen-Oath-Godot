@@ -155,6 +155,29 @@ func _run() -> void:
 	animated.call("_update_combat_animation", 0.05)
 	_check(upper.rotation.x > 0.05, "death state drives a collapse pose")
 
+	var strafe_fighter := _new_fighter("StrafeFighter", Vector3.ZERO)
+	var strafe_target := _new_fighter("StrafeTarget", Vector3(0.0, 0.0, -5.0))
+	strafe_fighter.is_player = true
+	strafe_fighter.target = strafe_target
+	strafe_fighter.input_move = Vector2(1.0, 0.0)
+	strafe_fighter.call("_player_update", 0.1)
+	_check(strafe_fighter.velocity.x > 0.0, "combat movement supports lateral strafing")
+	_check(absf(strafe_fighter.rotation.y) < 0.05, "player keeps facing the locked target while strafing")
+	var dodge_fighter := _new_fighter("DirectionalDodge", Vector3.ZERO)
+	var dodge_target := _new_fighter("DodgeTarget", Vector3(0.0, 0.0, -5.0))
+	dodge_fighter.is_player = true
+	dodge_fighter.target = dodge_target
+	dodge_fighter.input_move = Vector2(1.0, 0.0)
+	dodge_fighter.dodge()
+	_check(dodge_fighter.velocity.x > 9.0 and dodge_fighter.is_dodging, "directional dodge follows lateral input")
+	_check(absf(dodge_fighter.rotation.y) < 0.05, "directional dodge preserves target-facing orientation")
+	var backward_dodge := _new_fighter("BackwardDodge", Vector3.ZERO)
+	var backward_target := _new_fighter("BackwardTarget", Vector3(0.0, 0.0, -5.0))
+	backward_dodge.is_player = true
+	backward_dodge.target = backward_target
+	backward_dodge.dodge()
+	_check(backward_dodge.velocity.z > 9.0, "neutral dodge retreats away from the locked target")
+
 	var gait_fighter := _new_fighter("GaitFighter", Vector3.ZERO)
 	gait_fighter.is_player = true
 	var gait_upper := Node3D.new()
@@ -275,13 +298,13 @@ func _run() -> void:
 	sprinter.is_player = true
 	sprinter.input_move = Vector2(0, -1)
 	sprinter.call("_player_update", 0.016)
-	_check(sprinter.is_sprinting and sprinter.velocity.length() > sprinter.move_speed, "full joystick deflection triggers sprint speed")
+	_check(sprinter.is_sprinting and sprinter.velocity.length() > 0.0, "full joystick deflection requests sprint acceleration")
 	sprinter.input_move = Vector2(0, -0.6)
 	sprinter.sprint_requested = true
 	sprinter.call("_player_update", 0.016)
-	_check(sprinter.is_sprinting and sprinter.velocity.length() > sprinter.move_speed * 0.6 * 1.2, "keyboard sprint request works below full joystick deflection")
+	_check(sprinter.is_sprinting and sprinter.velocity.length() > 0.0, "keyboard sprint request works below full joystick deflection")
 
-	print("Combat tests: ", 82 - failures.size(), "/82 passed")
+	print("Combat tests: ", 87 - failures.size(), "/87 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:
