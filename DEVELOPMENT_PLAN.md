@@ -292,3 +292,13 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added a compact airborne vault pose with tucked legs and raised arms.
 - Headless validation: combat 104/104, boss 22/22, feedback 5/5, stealth/traversal world 10/10; editor import and main-scene smoke passed.
 - Limitation: this is a prototype traversal arc, not a hand-authored climbing animation or ledge-grab system.
+
+
+## M9 — Ledge mantle and active guard search
+- Added a contextual mantle action for reachable raised platforms: a chest-height obstacle probe, head-clearance probe, and landing-surface raycast validate the climb before traversal begins. Heights outside the supported range and blocked overhead clearance are rejected.
+- Mantle uses a distinct traversal duration and compact airborne pose while reusing the validated traversal lockout; it is separate from the shorter low-obstacle vault.
+- Added keyboard M and a dedicated touchscreen CLIMB action. Existing V / VAULT remains unchanged.
+- Improved the Sentinel's SEARCHING state: after reaching the last known position, it pauses and scans left/right before returning to patrol.
+- Regression coverage: successful low vault, successful raised-platform mantle, mantle completion at platform height, and rejection of a full-height wall; stealth world suite now has 14 assertions.
+- Headless validation: combat 104/104, boss 22/22, feedback integration 5/5, stealth world 14/14; editor import and main-scene smoke passed; `git diff --check` passed.
+- Limitation: mantle is a procedural eased arc, not an authored ledge-grab/climb animation. Search scanning is a simple yaw sweep. Cover-to-cover snapping, navigation around arbitrary geometry, shadow-pixel detection, and Android touch/device validation remain future work.

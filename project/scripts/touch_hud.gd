@@ -72,8 +72,9 @@ func _build_ui() -> void:
 	_register_action("DEATHBLOW", Vector2(-370, -70), "deathblow", Color(0.72, 0.08, 0.08))
 	_register_action("CROUCH", Vector2(-370, -250), "crouch", Color(0.25, 0.34, 0.39))
 	_register_action("VAULT", Vector2(-475, -250), "vault", Color(0.34, 0.39, 0.28))
+	_register_action("CLIMB", Vector2(-475, -170), "climb", Color(0.28, 0.39, 0.52))
 	var hint := Label.new()
-	hint.text = "C CROUCH  /  V VAULT low obstacles  /  Hide in bushes and crates"
+	hint.text = "C CROUCH  /  V VAULT  /  M CLIMB ledges  /  Hide in cover"
 	hint.position = Vector2(28, 132)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -169,6 +170,7 @@ func _action_down(action: String) -> void:
 				game.player.deathblow_broken_target()
 		"crouch": game.player.toggle_crouch()
 		"vault": game.player.try_vault()
+		"climb": game.player.try_mantle()
 
 func _action_up(action: String) -> void:
 	match action:

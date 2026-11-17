@@ -3,11 +3,11 @@
 Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-inspired combat, not affiliated with FromSoftware or Sekiro.
 
 ## Current milestone
-- Procedural combat arena and two CharacterBody3D fighters.
-- Third-person follow camera.
-- Mobile HUD with virtual movement stick, camera drag, attack, deflect, block, and dodge.
-- Initial Vitality/Posture model, short deflect window, basic enemy approach/attack AI.
-- Compatibility renderer selected for broad Android device support.
+- Godot 4.7.2 mobile-first 3D action prototype with Vitality/Posture combat, buffered combos, deflects, Mikiri/sweep counters, hitstop, and a two-phase boss.
+- Procedural third-person arena, primitive articulated fighter rigs, lock-on footwork, directional dodge, and adaptive camera framing.
+- Touch HUD with virtual stick, camera drag, combat actions, crouch, stealth deathblow, vault, and ledge mantle.
+- Sentinel patrols, vision-cone awareness, noise investigation, physical cover concealment, and a searching scan after losing sight.
+- Current validation is headless on Linux; Android export and real-device touch/visual checks are still pending.
 
 ## Roadmap
 1. Stabilize combat prototype and multi-touch input.

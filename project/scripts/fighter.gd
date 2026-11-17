@@ -78,6 +78,9 @@ var _vault_duration := 0.42
 var _vault_start := Vector3.ZERO
 var _vault_end := Vector3.ZERO
 var _vault_height := 0.82
+var _traversal_kind := "vault"
+var _search_scan_time := 0.0
+var _search_origin_yaw := 0.0
 var body_collision: CollisionShape3D
 var patrol_points: Array[Vector3] = []
 var patrol_index := 0
@@ -576,9 +579,13 @@ func _ai_update(delta: float) -> void:
 			_face_direction(search_dir.normalized(), delta, 5.0)
 		else:
 			search_timer -= delta
+			_search_scan_time += delta
+			var scan_angle := sin(_search_scan_time * 2.8) * 0.78
+			rotation.y = lerp_angle(rotation.y, _search_origin_yaw + scan_angle, 1.0 - exp(-3.5 * delta))
 			if search_timer <= 0.0:
 				awareness_state = AwarenessState.IDLE
 				suspicion = 0.0
+				_search_scan_time = 0.0
 	elif awareness_state == AwarenessState.IDLE:
 		_patrol_update(delta)
 
@@ -603,6 +610,48 @@ func _patrol_update(delta: float) -> void:
 	velocity.x = direction.x * patrol_speed
 	velocity.z = direction.z * patrol_speed
 	_face_direction(direction, delta, 4.0)
+
+func try_mantle() -> bool:
+	if not is_player or is_dead or is_vaulting or state != CombatState.FREE or not is_on_floor():
+		return false
+	var forward := -global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	if forward.length_squared() < 0.5:
+		return false
+	var space := get_world_3d().direct_space_state
+	var chest_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.02, global_position + Vector3.UP * 1.02 + forward * 1.05)
+	chest_query.exclude = [get_rid()]
+	var obstacle_hit := space.intersect_ray(chest_query)
+	if obstacle_hit.is_empty():
+		return false
+	var head_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.92, global_position + Vector3.UP * 1.92 + forward * 1.20)
+	head_query.exclude = [get_rid()]
+	if not space.intersect_ray(head_query).is_empty():
+		return false
+	var landing := global_position + forward * 1.75
+	var floor_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.8, landing + Vector3.DOWN * 2.8)
+	floor_query.exclude = [get_rid()]
+	var floor_hit := space.intersect_ray(floor_query)
+	if floor_hit.is_empty():
+		return false
+	var landing_y: float = (floor_hit.position as Vector3).y
+	var rise := landing_y - global_position.y
+	if rise < 0.45 or rise > 1.55:
+		return false
+	landing.y = landing_y
+	_vault_start = global_position
+	_vault_end = landing
+	_vault_elapsed = 0.0
+	_vault_duration = 0.62
+	_vault_height = 0.38
+	_traversal_kind = "mantle"
+	is_vaulting = true
+	is_crouching = false
+	is_sprinting = false
+	sprint_requested = false
+	velocity = Vector3.ZERO
+	return true
 
 func try_vault() -> bool:
 	if not is_player or is_dead or is_vaulting or state != CombatState.FREE or not is_on_floor():
@@ -634,6 +683,7 @@ func try_vault() -> bool:
 	_vault_elapsed = 0.0
 	_vault_duration = 0.42
 	_vault_height = 0.82
+	_traversal_kind = "vault"
 	is_vaulting = true
 	is_crouching = false
 	is_sprinting = false
@@ -649,6 +699,7 @@ func _update_vault(delta: float) -> void:
 	if t >= 1.0:
 		global_position = _vault_end
 		is_vaulting = false
+		_traversal_kind = "vault"
 		velocity = Vector3.ZERO
 
 func set_crouching(enabled: bool) -> void:
@@ -705,7 +756,9 @@ func _update_awareness(delta: float) -> void:
 			lost_sight_timer += delta
 			if lost_sight_timer >= 4.0:
 				awareness_state = AwarenessState.SEARCHING
-				search_timer = 2.6
+				search_timer = 3.8
+				_search_origin_yaw = rotation.y
+				_search_scan_time = 0.0
 
 func _get_target_vision_multiplier(candidate: Node3D) -> float:
 	if not is_instance_valid(candidate):

@@ -56,6 +56,21 @@ func _run() -> void:
 	for i in range(30):
 		await physics_frame
 	_check(not player.is_vaulting and player.global_position.z < start_z - 1.4, "vault completes beyond the obstacle")
+	var ledge := StaticBody3D.new()
+	ledge.position = player.global_position + Vector3(0.0, 0.65, -1.4)
+	game.add_child(ledge)
+	var ledge_shape := CollisionShape3D.new()
+	var ledge_box := BoxShape3D.new()
+	ledge_box.size = Vector3(2.4, 1.3, 1.8)
+	ledge_shape.shape = ledge_box
+	ledge.add_child(ledge_shape)
+	await physics_frame
+	var mantle_start_y := player.global_position.y
+	_check(player.try_mantle(), "player can mantle a reachable waist-high ledge")
+	_check(player.is_vaulting and player._traversal_kind == "mantle", "mantle enters the dedicated ledge traversal")
+	for i in range(42):
+		await physics_frame
+	_check(not player.is_vaulting and player.global_position.y > mantle_start_y + 0.7, "mantle completes on the raised platform")
 	var tall_wall := StaticBody3D.new()
 	tall_wall.position = player.global_position + Vector3(0.0, 0.0, -1.2)
 	game.add_child(tall_wall)
@@ -69,7 +84,7 @@ func _run() -> void:
 	_check(not player.try_vault(), "vault rejects a full-height wall")
 	_check(not player.is_vaulting, "rejected traversal leaves player in normal movement state")
 	if failures.is_empty():
-		print("Stealth world tests: 10/10 passed")
+		print("Stealth world tests: 14/14 passed")
 	else:
-		printerr("Stealth world tests: ", 10 - failures.size(), "/10 passed")
+		printerr("Stealth world tests: ", 14 - failures.size(), "/14 passed")
 	quit(0 if failures.is_empty() else 1)
