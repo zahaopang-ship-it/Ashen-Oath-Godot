@@ -394,3 +394,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added an exploration-objectives regression suite covering initial state, both objective transitions, reward amounts, duplicate-reward prevention, and HUD integration (11 assertions).
 - Headless validation: all 295 assertions across eleven suites pass; Godot 4.7.2 editor import and main-scene smoke pass; `git diff --check` passes.
 - Limitations: objective progress and rewards are session-only; there is no save/load persistence, journal UI, branching quest logic, map marker, or Android touch/rendering validation. Guard navigation remains waypoint-based and does not yet have global pathfinding.
+
+
+## M20 — Collision-aware sentinel steering
+- Added a lightweight local navigation steering layer for Sentinel patrol, last-known-position investigation, and alerted pursuit. It probes the direct corridor and six angled alternatives using physics ray queries, then selects a clear direction that balances forward progress and obstacle clearance.
+- AI velocity now accelerates toward the chosen steering direction rather than snapping directly toward a waypoint. When the corridor is clear, guards preserve their original direct route.
+- Added a dedicated guard-navigation suite (6 assertions): clear-route preservation, wall detection, lateral detour selection, forward progress, controlled velocity, no temporary-node creation, and route recovery after obstacle removal.
+- Full headless validation: 301/301 assertions across twelve suites pass. Godot 4.7.2 editor import and main-scene smoke pass; `git diff --check` passes.
+- Scope/limitations: this is local ray-probe steering, not global pathfinding or a NavigationServer3D/navmesh solution. It does not guarantee a route around large or enclosed obstacles, and it does not yet model crowd avoidance between guards. No APK or Android device validation was performed.

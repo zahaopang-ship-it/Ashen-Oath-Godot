@@ -729,10 +729,7 @@ func _ai_update(delta: float) -> void:
 	var distance := to_target.length()
 	if awareness_state == AwarenessState.ALERTED:
 		if distance > 1.7:
-			var dir := to_target.normalized()
-			velocity.x = dir.x * move_speed * 0.72
-			velocity.z = dir.z * move_speed * 0.72
-			_face_direction(dir, delta)
+			_steer_ai_toward(target.global_position, move_speed * 0.72, delta, combat_turn_speed)
 		else:
 			velocity.x = move_toward(velocity.x, 0.0, 22.0 * delta)
 			velocity.z = move_toward(velocity.z, 0.0, 22.0 * delta)
@@ -757,10 +754,7 @@ func _ai_update(delta: float) -> void:
 			var search_dir := _search_points[_search_point_index] - global_position
 			search_dir.y = 0.0
 			if search_dir.length() > 0.55:
-				var direction := search_dir.normalized()
-				velocity.x = direction.x * patrol_speed * 0.9
-				velocity.z = direction.z * patrol_speed * 0.9
-				_face_direction(direction, delta, 5.0)
+				_steer_ai_toward(_search_points[_search_point_index], patrol_speed * 0.9, delta, 5.0)
 			else:
 				velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
 				velocity.z = move_toward(velocity.z, 0.0, 20.0 * delta)
@@ -803,10 +797,48 @@ func _patrol_update(delta: float) -> void:
 		patrol_index = (patrol_index + 1) % patrol_points.size()
 		patrol_wait_timer = _patrol_pause
 		return
-	direction = direction.normalized()
-	velocity.x = direction.x * patrol_speed
-	velocity.z = direction.z * patrol_speed
-	_face_direction(direction, delta, 4.0)
+	_steer_ai_toward(waypoint, patrol_speed, delta, 4.0)
+
+func _steer_ai_toward(destination: Vector3, speed: float, delta: float, turn_speed: float) -> void:
+	var desired := destination - global_position
+	desired.y = 0.0
+	if desired.length_squared() < 0.0025:
+		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
+		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
+		return
+	var direction := _get_navigation_direction(desired.normalized())
+	var desired_velocity := direction * speed
+	velocity.x = move_toward(velocity.x, desired_velocity.x, 10.0 * delta)
+	velocity.z = move_toward(velocity.z, desired_velocity.z, 10.0 * delta)
+	_face_direction(direction, delta, turn_speed)
+
+func _get_navigation_direction(desired_direction: Vector3, probe_distance: float = 1.9) -> Vector3:
+	var desired := Vector3(desired_direction.x, 0.0, desired_direction.z)
+	if desired.length_squared() < 0.001:
+		return Vector3.ZERO
+	desired = desired.normalized()
+	if not is_inside_tree() or get_world_3d() == null:
+		return desired
+	var origin := global_position - Vector3.UP * 0.55
+	var space := get_world_3d().direct_space_state
+	var forward_query := PhysicsRayQueryParameters3D.create(origin, origin + desired * probe_distance)
+	forward_query.exclude = [get_rid()]
+	if space.intersect_ray(forward_query).is_empty():
+		return desired
+	var best_direction := desired
+	var best_score := -INF
+	for angle in [-1.15, 1.15, -0.72, 0.72, -1.62, 1.62]:
+		var candidate := desired.rotated(Vector3.UP, angle).normalized()
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + candidate * probe_distance)
+		query.exclude = [get_rid()]
+		var hit := space.intersect_ray(query)
+		var clearance := probe_distance if hit.is_empty() else origin.distance_to(hit.position)
+		var alignment := candidate.dot(desired)
+		var score := alignment * 1.35 + (clearance / probe_distance) * 0.9
+		if score > best_score:
+			best_score = score
+			best_direction = candidate
+	return best_direction
 
 func _try_wall_corner_transition(tangent_direction: Vector3) -> bool:
 	if tangent_direction.length_squared() < 0.5 or _wall_hug_normal.length_squared() < 0.5:
