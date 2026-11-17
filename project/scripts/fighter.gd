@@ -52,21 +52,26 @@ var buffered_attack_kind := ""
 var attack_buffer_timer := 0.0
 var combo_step := 0
 var combo_reset_timer := 0.0
+var dodge_cooldown := 0.0
+var is_sprinting := false
+var sprint_requested := false
+var posture_stomped := false
 
 const WINDUP_TIME := 0.32
 const ACTIVE_TIME := 0.10
 const RECOVERY_TIME := 0.34
 const POSTURE_BREAK_TIME := 1.35
 const HIT_FLASH_COLOR := Color(1.0, 0.72, 0.58)
-const ATTACK_KINDS := ["slash", "thrust", "sweep", "heavy"]
-const ATTACK_DAMAGE := {"slash": 22.0, "thrust": 27.0, "sweep": 18.0, "heavy": 34.0}
-const ATTACK_POSTURE := {"slash": 30.0, "thrust": 36.0, "sweep": 24.0, "heavy": 46.0}
-const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0.62}
+const ATTACK_KINDS := ["slash", "thrust", "sweep", "heavy", "grab"]
+const ATTACK_DAMAGE := {"slash": 22.0, "thrust": 27.0, "sweep": 18.0, "heavy": 34.0, "grab": 30.0}
+const ATTACK_POSTURE := {"slash": 30.0, "thrust": 36.0, "sweep": 24.0, "heavy": 46.0, "grab": 12.0}
+const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0.62, "grab": 0.72}
 const ATTACK_HITBOX := {
 	"slash": Vector3(0.95, 1.25, 1.65),
 	"thrust": Vector3(0.52, 1.10, 2.10),
 	"sweep": Vector3(1.45, 0.62, 1.55),
-	"heavy": Vector3(1.00, 1.40, 1.90)
+	"heavy": Vector3(1.00, 1.40, 1.90),
+	"grab": Vector3(0.85, 1.15, 1.45)
 }
 const ATTACK_BUFFER_WINDOW := 0.58
 const COMBO_RESET_TIME := 0.95
@@ -79,6 +84,7 @@ func _physics_process(delta: float) -> void:
 	deflect_timer = maxf(0.0, deflect_timer - delta)
 	deflect_cooldown = maxf(0.0, deflect_cooldown - delta)
 	dodge_timer = maxf(0.0, dodge_timer - delta)
+	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
 	counter_timer = maxf(0.0, counter_timer - delta)
 	attack_buffer_timer = maxf(0.0, attack_buffer_timer - delta)
 	if attack_buffer_timer <= 0.0:
@@ -179,6 +185,9 @@ func _update_combat_animation(delta: float) -> void:
 			"heavy":
 				body_pose = Vector3(-0.48, 0.0, -0.16) * anticipation
 				weapon_pose = Vector3(-1.85, 0.0, -0.45) * anticipation
+			"grab":
+				body_pose = Vector3(-0.25, 0.0, -0.32) * anticipation
+				weapon_pose = Vector3(0.15, 0.0, 0.45) * anticipation
 	elif state == CombatState.ACTIVE:
 		var progress := 1.0 - clampf(attack_timer / ACTIVE_TIME, 0.0, 1.0)
 		var follow := sin(progress * PI)
@@ -195,6 +204,9 @@ func _update_combat_animation(delta: float) -> void:
 			"heavy":
 				body_pose = Vector3(0.22, 0.0, 0.65) * follow
 				weapon_pose = Vector3(1.75, 0.0, 1.0) * follow
+			"grab":
+				body_pose = Vector3(0.42, 0.0, 0.55) * follow
+				weapon_pose = Vector3(-0.25, 0.0, 0.7) * follow
 	elif state == CombatState.RECOVERY:
 		body_pose = Vector3(0.08, 0.0, 0.08)
 		weapon_pose = Vector3(0.18, 0.0, -0.10)
@@ -248,11 +260,13 @@ func _player_update(delta: float) -> void:
 	var forward := -global_transform.basis.z
 	var right := global_transform.basis.x
 	var move_dir := right * input_move.x + forward * -input_move.y
+	is_sprinting = sprint_requested or input_move.length() >= 0.82
+	var current_speed := move_speed * (1.42 if is_sprinting else 1.0)
 	if move_dir.length() > 1.0:
 		move_dir = move_dir.normalized()
 	if move_dir.length() > 0.08:
-		velocity.x = move_dir.x * move_speed
-		velocity.z = move_dir.z * move_speed
+		velocity.x = move_dir.x * current_speed
+		velocity.z = move_dir.z * current_speed
 		_face_direction(move_dir, delta)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, 24.0 * delta)
@@ -284,6 +298,8 @@ func _ai_update(delta: float) -> void:
 				chosen = "sweep"
 			elif roll < 0.48:
 				chosen = "heavy"
+			elif roll < 0.57:
+				chosen = "grab"
 			start_attack(chosen)
 
 func _face_direction(dir: Vector3, delta: float) -> void:
@@ -340,12 +356,12 @@ func receive_strike(damage: float, posture_damage: float, attacker: Node3D, inco
 			attacker.receive_deflect(32.0)
 		combat_feedback.emit("sweep_evaded", self)
 		return "sweep_evaded"
-	if is_deflecting:
+	if is_deflecting and incoming_kind != "grab":
 		if is_instance_valid(attacker) and attacker.has_method("receive_deflect"):
 			attacker.receive_deflect(40.0 if incoming_kind == "heavy" else 26.0)
 		combat_feedback.emit("deflect", self)
 		return "deflected"
-	if is_blocking:
+	if is_blocking and incoming_kind != "grab":
 		var block_scale := 0.85 if incoming_kind == "heavy" else (0.72 if incoming_kind == "thrust" else 0.55)
 		posture += posture_damage * block_scale
 		_check_posture_break()
@@ -358,8 +374,12 @@ func receive_strike(damage: float, posture_damage: float, attacker: Node3D, inco
 		_die()
 	else:
 		_begin_hit_reaction(attacker)
-		combat_feedback.emit("hit", self)
-	return "hit"
+		if incoming_kind == "grab":
+			hit_reaction_timer = 0.62
+			combat_feedback.emit("grabbed", self)
+		else:
+			combat_feedback.emit("hit", self)
+	return "grabbed" if incoming_kind == "grab" else "hit"
 
 func receive_deflect(amount: float) -> void:
 	if is_dead:
@@ -373,6 +393,7 @@ func _check_posture_break() -> void:
 		state = CombatState.POSTURE_BROKEN
 		attack_phase_changed.emit("interrupted")
 		posture_break_timer = POSTURE_BREAK_TIME
+		posture_stomped = false
 		hit_reaction_timer = 0.0
 		is_blocking = false
 		deflect_timer = 0.0
@@ -428,9 +449,10 @@ func end_block() -> void:
 	is_blocking = false
 
 func dodge() -> void:
-	if is_dead or state != CombatState.FREE or is_dodging:
+	if is_dead or state != CombatState.FREE or is_dodging or dodge_cooldown > 0.0:
 		return
 	dodge_timer = 0.38
+	dodge_cooldown = 0.52
 	is_dodging = true
 	var dir := global_transform.basis.x * input_move.x + (-global_transform.basis.z) * -input_move.y
 	if dir.length() < 0.1:
@@ -458,6 +480,29 @@ func request_player_attack() -> bool:
 
 func player_attack() -> void:
 	request_player_attack()
+
+func stomp_broken_target() -> bool:
+	if is_dead or state != CombatState.FREE or not is_instance_valid(target):
+		return false
+	if target.state != CombatState.POSTURE_BROKEN or target.is_dead or target.posture_stomped:
+		return false
+	var offset := target.global_position - global_position
+	offset.y = 0.0
+	if offset.length() > 2.35:
+		return false
+	if offset.length_squared() > 0.001 and (-global_transform.basis.z).normalized().dot(offset.normalized()) < 0.0:
+		return false
+	return target.receive_stomp(self)
+
+func receive_stomp(attacker: Node3D) -> bool:
+	if is_dead or state != CombatState.POSTURE_BROKEN or posture_stomped:
+		return false
+	posture_stomped = true
+	vitality = maxf(0.0, vitality - 18.0)
+	combat_feedback.emit("stomp", self)
+	if vitality <= 0.0:
+		_die()
+	return true
 
 func get_vitality_ratio() -> float:
 	return vitality / maxf(1.0, max_vitality)

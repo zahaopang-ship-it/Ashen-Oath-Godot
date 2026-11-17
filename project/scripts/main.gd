@@ -23,7 +23,9 @@ const AUDIO_EVENTS := {
 	"sweep_evaded": "res://audio/sword_deflect.wav",
 	"guard": "res://audio/guard_clang.wav",
 	"posture_break": "res://audio/posture_break.wav",
-	"death": "res://audio/impact_body.wav"
+	"death": "res://audio/impact_body.wav",
+	"grabbed": "res://audio/impact_body.wav",
+	"stomp": "res://audio/posture_break.wav"
 }
 
 func _ready() -> void:
@@ -163,7 +165,8 @@ func _on_enemy_telegraph_started(kind: String) -> void:
 		"slash": Color(1.0, 0.16, 0.055),
 		"thrust": Color(1.0, 0.72, 0.08),
 		"sweep": Color(0.18, 0.72, 1.0),
-		"heavy": Color(0.78, 0.12, 1.0)
+		"heavy": Color(0.78, 0.12, 1.0),
+		"grab": Color(1.0, 0.92, 0.72)
 	}
 	material.albedo_color = colors.get(kind, Color(1.0, 0.16, 0.055))
 	material.emission = material.albedo_color
@@ -224,6 +227,12 @@ func _on_combat_feedback(kind: String, source: Node3D) -> void:
 		"death":
 			hitstop = 0.12
 			shake = 0.52
+		"grabbed":
+			hitstop = 0.07
+			shake = 0.36
+		"stomp":
+			hitstop = 0.085
+			shake = 0.42
 	_trigger_hitstop(hitstop, shake)
 	_play_combat_sound(kind, source.global_position)
 
@@ -273,6 +282,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE: player.dodge()
 			KEY_I: player.begin_mikiri_counter()
 			KEY_O: player.begin_sweep_evade()
+			KEY_P: player.stomp_broken_target()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:
@@ -284,6 +294,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Input.is_key_pressed(KEY_W): move.y -= 1.0
 	if Input.is_key_pressed(KEY_S): move.y += 1.0
 	player.input_move = move.normalized() if move.length() > 1.0 else move
+	player.sprint_requested = Input.is_key_pressed(KEY_SHIFT)
 
 func rotate_camera(delta_x: float, delta_y: float) -> void:
 	camera_yaw -= delta_x * 0.004

@@ -74,7 +74,7 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - [x] Deflect window (200 ms), post-deflect lockout, held-guard fallback, and posture pressure.
 - [x] Posture threshold enters a timed broken state; vitality-dependent posture recovery.
 - [x] Independent touch pointer tracking for movement, camera, and action-button fingers; keyboard debug controls (WASD/J/K/L/Space).
-- [x] Headless combat logic suite: 56 assertions passing (including attack hit-volume, combo-buffer, and feedback-event checks).
+- [x] Headless combat logic suite: 67 assertions passing (including attack hit-volume, combo-buffer, grab/stomp, dodge cooldown, and sprint checks).
 - [x] Feedback integration suite: 3/3 checks (hitstop activation/restoration and spatial sound node creation).
 - [ ] Validate simultaneous touch on a physical Android device; headless tests cannot prove touch-driver behavior.
 - [x] Add a visible pulsing enemy windup marker and light camera impact feedback on confirmed hits.
@@ -87,7 +87,10 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - [x] Procedural combat pose foundation: attack anticipation/follow-through, guard, hitstun, posture break, and death.
 - [x] Three-step slash/slash/heavy combo with a 0.58-second buffered input window.
 - [x] Attack-specific forward hit volumes evaluated during active frames (narrow thrust, wide sweep, standard slash, heavy).
-- [ ] Stomp and dodge/grab.
+- [x] Stomp punish against a nearby posture-broken target.
+- [x] Grab attack bypasses guard/deflect but is evaded by dodge; enemy AI can select it.
+- [x] Dodge cooldown prevents repeated invulnerability-window spam.
+- [x] Sprint movement activates at full joystick deflection; keyboard Shift is supported.
 - [x] Short hitstop on hit, deflect, Mikiri/sweep counter, posture break, and death.
 - [x] Stronger decaying camera shake and impact nudge tuned by combat event.
 - [x] Original generated spatial SFX for body impact, sword deflect, guard clang, and posture break.
@@ -159,3 +162,14 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - No commercial/third-party sound assets were copied; these are procedural placeholder SFX pending final sound design.
 
 - Feedback integration test: `project/tests/feedback_integration_test.gd` verifies hitstop activation/restoration and 3D impact audio node creation in a live headless scene.
+
+
+## M2 — Grab, stomp, dodge discipline, and sprint movement
+- Added a telegraphed grab attack with its own windup, damage, and forward reach; guard and deflect do not counter grabs, while dodge still evades them.
+- Added an extended grab hit reaction and mapped grab feedback to the impact sound event.
+- Enemy AI can now select grabs occasionally, and the telegraph uses a pale warning color.
+- Added a contextual stomp action that damages a nearby posture-broken target and rejects distant or non-broken targets.
+- Added dodge cooldown to prevent immediate repeated evasion windows.
+- Full virtual-stick deflection now produces sprint speed; desktop debug input supports Shift sprint.
+- Added touch HUD STOMP button and keyboard P shortcut.
+- Expanded headless combat checks for grab counter rules, stomp conditions, dodge cooldown, and sprint speed.

@@ -65,6 +65,7 @@ func _build_ui() -> void:
 	_register_action("DODGE", Vector2(-95, -70), "dodge", Color(0.25, 0.42, 0.32))
 	_register_action("MIKIRI", Vector2(-275, -70), "mikiri", Color(0.58, 0.25, 0.12))
 	_register_action("JUMP", Vector2(-195, -70), "jump", Color(0.18, 0.42, 0.55))
+	_register_action("STOMP", Vector2(-370, -145), "stomp", Color(0.52, 0.30, 0.12))
 	var hint := Label.new()
 	hint.text = "WASD move  J combo  K deflect  L block  Space dodge  I Mikiri  O jump"
 	hint.position = Vector2(28, 132)
@@ -156,6 +157,7 @@ func _action_down(action: String) -> void:
 		"dodge": game.player.dodge()
 		"mikiri": game.player.begin_mikiri_counter()
 		"jump": game.player.begin_sweep_evade()
+		"stomp": game.player.stomp_broken_target()
 
 func _action_up(action: String) -> void:
 	match action:
@@ -178,7 +180,8 @@ func _process(_delta: float) -> void:
 	posture_bar.value = game.player.get_posture_ratio() * 100.0
 	enemy_vitality.value = game.enemy.get_vitality_ratio() * 100.0
 	enemy_posture.value = game.enemy.get_posture_ratio() * 100.0
-	status_label.text = "PLAYER: " + _state_name(game.player) + "   |   ENEMY: " + _state_name(game.enemy)
+	var movement_label := "SPRINT" if game.player.is_sprinting else "WALK"
+	status_label.text = "PLAYER: " + _state_name(game.player) + " / " + movement_label + "   |   ENEMY: " + _state_name(game.enemy)
 
 func _state_name(fighter: Node) -> String:
 	if fighter.state == 4: return "POSTURE BROKEN"

@@ -183,8 +183,46 @@ func _run() -> void:
 	dodger.dodge()
 	_check(dodger.is_dodging, "dodge grants an active evasion window")
 	_check(dodger.receive_strike(20.0, 20.0, attacker) == "evaded", "dodge window evades incoming strike")
+	var dodge_timer_before: float = dodger.dodge_timer
+	dodger.dodge()
+	_check(is_equal_approx(dodger.dodge_timer, dodge_timer_before), "dodge cooldown prevents immediate repeat")
 
-	print("Combat tests: ", 56 - failures.size(), "/56 passed")
+	var grab_defender := _new_fighter("GrabDefender", Vector3.ZERO)
+	grab_defender.begin_block()
+	_check(grab_defender.receive_strike(30.0, 12.0, attacker, "grab") == "grabbed", "grab bypasses held guard")
+	_check(grab_defender.vitality < 100.0 and grab_defender.hit_reaction_timer > 0.5, "grab applies damage and extended hit reaction")
+	var grab_deflector := _new_fighter("GrabDeflector", Vector3.ZERO)
+	grab_deflector.begin_deflect()
+	_check(grab_deflector.receive_strike(30.0, 12.0, attacker, "grab") == "grabbed", "grab cannot be deflected")
+	var grab_evader := _new_fighter("GrabEvader", Vector3.ZERO)
+	grab_evader.dodge()
+	_check(grab_evader.receive_strike(30.0, 12.0, attacker, "grab") == "evaded", "dodge evades a grab")
+
+	var stomp_player := _new_fighter("StompPlayer", Vector3.ZERO)
+	var stomp_target := _new_fighter("StompTarget", Vector3(0, 0, -1.2))
+	stomp_player.is_player = true
+	stomp_player.target = stomp_target
+	stomp_target.state = 4
+	_check(stomp_player.stomp_broken_target(), "stomp punishes a nearby posture-broken target")
+	_check(is_equal_approx(stomp_target.vitality, 82.0), "stomp deals vitality damage to broken target")
+	_check(not stomp_player.stomp_broken_target(), "stomp cannot be repeated on the same posture break")
+	var distant_stomp := _new_fighter("DistantStomp", Vector3.ZERO)
+	var distant_target := _new_fighter("DistantTarget", Vector3(0, 0, -4.0))
+	distant_stomp.target = distant_target
+	distant_target.state = 4
+	_check(not distant_stomp.stomp_broken_target(), "stomp requires close range")
+
+	var sprinter := _new_fighter("Sprinter", Vector3.ZERO)
+	sprinter.is_player = true
+	sprinter.input_move = Vector2(0, -1)
+	sprinter.call("_player_update", 0.016)
+	_check(sprinter.is_sprinting and sprinter.velocity.length() > sprinter.move_speed, "full joystick deflection triggers sprint speed")
+	sprinter.input_move = Vector2(0, -0.6)
+	sprinter.sprint_requested = true
+	sprinter.call("_player_update", 0.016)
+	_check(sprinter.is_sprinting and sprinter.velocity.length() > sprinter.move_speed * 0.6 * 1.2, "keyboard sprint request works below full joystick deflection")
+
+	print("Combat tests: ", 67 - failures.size(), "/67 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:
