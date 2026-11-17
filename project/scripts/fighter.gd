@@ -5,6 +5,7 @@ const STEALTH_AWARENESS = preload("res://scripts/ai/stealth_awareness_controller
 const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
 const TRAVERSAL_CONTROLLER = preload("res://scripts/traversal/fighter_traversal_controller.gd")
 const PROSTHETIC_CONTROLLER = preload("res://scripts/prosthetics/fighter_prosthetic_controller.gd")
+const EXPLORATION_CONTROLLER = preload("res://scripts/exploration/fighter_exploration_controller.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -951,17 +952,17 @@ func _get_target_vision_multiplier(candidate: Node3D) -> float:
 	return STEALTH_AWARENESS.get_target_vision_multiplier(self, candidate)
 
 
-func set_stealth_cover(_zone: Area3D, entering: bool) -> void:
-	stealth_cover_count = maxi(0, stealth_cover_count + (1 if entering else -1))
-	is_in_cover = stealth_cover_count > 0
+func set_stealth_cover(zone: Area3D, entering: bool) -> void:
+	STEALTH_AWARENESS.set_stealth_cover(self, zone, entering)
+
 
 func _on_cover_zone_body_entered(body: Node3D, zone: Area3D) -> void:
-	if body == self:
-		set_stealth_cover(zone, true)
+	STEALTH_AWARENESS.on_cover_zone_body_entered(self, body, zone)
+
 
 func _on_cover_zone_body_exited(body: Node3D, zone: Area3D) -> void:
-	if body == self:
-		set_stealth_cover(zone, false)
+	STEALTH_AWARENESS.on_cover_zone_body_exited(self, body, zone)
+
 
 func _target_in_vision_cone(offset: Vector3) -> bool:
 	return STEALTH_AWARENESS.target_in_vision_cone(self, offset)
@@ -1177,106 +1178,28 @@ func _update_ledge_hang(delta: float) -> void:
 
 
 func set_checkpoint(position: Vector3) -> void:
-	checkpoint_position = position
+	EXPLORATION_CONTROLLER.set_checkpoint(self, position)
+
 
 func get_nearest_rest_point(max_distance: float = 2.8) -> Node3D:
-	if not is_player or is_dead:
-		return null
-	var nearest: Node3D = null
-	var nearest_distance := max_distance
-	for candidate in get_tree().get_nodes_in_group("rest_points"):
-		if not candidate is Node3D or not is_instance_valid(candidate):
-			continue
-		var distance := global_position.distance_to(candidate.global_position)
-		if distance <= nearest_distance:
-			nearest = candidate
-			nearest_distance = distance
-	return nearest
+	return EXPLORATION_CONTROLLER.get_nearest_rest_point(self, max_distance)
+
 
 func interact_rest_point(max_distance: float = 2.8) -> bool:
-	if not is_player or is_dead or state != CombatState.FREE or is_grappling or is_vaulting or is_climbing or is_ledge_hanging:
-		return false
-	var shrine := get_nearest_rest_point(max_distance)
-	if not is_instance_valid(shrine):
-		return false
-	for candidate in get_tree().get_nodes_in_group("rest_points"):
-		if candidate.has_method("set_active"):
-			candidate.set_active(candidate == shrine)
-	checkpoint_position = shrine.global_position + Vector3(0.0, 0.0, 1.5)
-	exploration_event.emit("rest:" + shrine.name)
-	global_position = checkpoint_position
-	velocity = Vector3.ZERO
-	vitality = max_vitality
-	posture = 0.0
-	prosthetic_energy = max_prosthetic_energy
-	resurrection_charges = max_resurrection_charges
-	resurrection_available = true
-	resurrection_invulnerability = 0.0
-	return true
+	return EXPLORATION_CONTROLLER.interact_rest_point(self, max_distance)
+
 
 func interact_secret_cache(max_distance: float = 2.5) -> bool:
-	if not is_player or is_dead or state != CombatState.FREE:
-		return false
-	var nearest: Node3D = null
-	var nearest_distance := max_distance
-	for candidate in get_tree().get_nodes_in_group("secret_caches"):
-		if not candidate is Node3D or not is_instance_valid(candidate) or bool(candidate.get_meta("collected", false)):
-			continue
-		var distance := global_position.distance_to(candidate.global_position)
-		if distance <= nearest_distance:
-			nearest = candidate
-			nearest_distance = distance
-	if not is_instance_valid(nearest):
-		return false
-	nearest.set_meta("collected", true)
-	exploration_event.emit("cache_collected")
-	nearest.visible = false
-	prosthetic_upgrade_points += 1
-	prosthetic_energy = minf(max_prosthetic_energy, prosthetic_energy + 25.0)
-	return true
+	return EXPLORATION_CONTROLLER.interact_secret_cache(self, max_distance)
+
 
 func get_nearest_secret_cache(max_distance: float = 2.5) -> Node3D:
-	if not is_player or is_dead:
-		return null
-	var nearest: Node3D = null
-	var nearest_distance := max_distance
-	for candidate in get_tree().get_nodes_in_group("secret_caches"):
-		if not candidate is Node3D or not is_instance_valid(candidate) or bool(candidate.get_meta("collected", false)):
-			continue
-		var distance := global_position.distance_to(candidate.global_position)
-		if distance <= nearest_distance:
-			nearest = candidate
-			nearest_distance = distance
-	return nearest
+	return EXPLORATION_CONTROLLER.get_nearest_secret_cache(self, max_distance)
+
 
 func resurrect() -> bool:
-	if not is_player or not is_dead or not resurrection_available or resurrection_charges <= 0:
-		return false
-	resurrection_charges -= 1
-	resurrection_available = false
-	is_dead = false
-	state = CombatState.FREE
-	vitality = max_vitality * 0.55
-	posture = 0.0
-	velocity = Vector3.ZERO
-	global_position = checkpoint_position
-	is_blocking = false
-	is_deflecting = false
-	is_dodging = false
-	is_crouching = false
-	is_wall_hugging = false
-	is_cover_transferring = false
-	is_grappling = false
-	is_swimming = false
-	swim_vertical_input = 0.0
-	is_climbing = false
-	is_ledge_hanging = false
-	attack_timer = 0.0
-	attack_buffer_timer = 0.0
-	buffered_attack_kind = ""
-	resurrection_invulnerability = 1.35
-	combat_feedback.emit("resurrection", self)
-	return true
+	return EXPLORATION_CONTROLLER.resurrect(self)
+
 
 func begin_jump() -> bool:
 	return TRAVERSAL_CONTROLLER.begin_jump(self)
