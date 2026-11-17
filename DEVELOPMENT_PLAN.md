@@ -410,3 +410,12 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added three regression assertions for near-neighbor avoidance, preserving a normalized usable travel direction with lateral spacing, and no influence beyond the separation radius.
 - Full headless validation: 304/304 assertions across twelve suites pass. Godot 4.7.2 editor import and main-scene smoke pass; `git diff --check` passes.
 - Limitations: no NavigationRegion3D/navmesh or global route planning yet. This remains local ray-probe obstacle steering plus short-range guard separation; dense groups and enclosed obstacles may still cause congestion. No APK or Android device validation was performed.
+
+
+## M22 — Global sentinel route queries
+- Added a shared NavigationRegion3D to the valley with a coarse walkable polygon covering the bounded ground area.
+- Added a NavigationAgent3D to each non-player, non-boss sentinel and configured agent radius, height, and path arrival tolerances.
+- Sentinel patrol, investigation, and alerted pursuit now request the next point from the agent path and feed that direction into the existing collision-aware ray steering and local guard separation.
+- Added five route assertions covering region registration, agent ownership, long-distance route calculation, destination reachability, and consumption of the agent direction by AI steering.
+- Full headless validation: 309/309 assertions across twelve suites pass. Godot 4.7.2 editor import and main-scene smoke pass; git diff --check passes.
+- Limitations: the current NavigationRegion3D is a coarse rectangular ground polygon; it does not yet carve fence, tree, or prop obstacles from the navmesh. Local physics probes still handle immediate obstacle detours, and dense crowd behavior is only short-range separation. No APK or Android device validation was performed.

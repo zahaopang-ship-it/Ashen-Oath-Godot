@@ -21,6 +21,22 @@ func _run() -> void:
 	await physics_frame
 	var guard: CharacterBody3D = game.guard
 	guard.global_position = Vector3(0.0, 0.0, 4.0)
+	var nav_region := game.get_node_or_null("AshenValeNavigationRegion") as NavigationRegion3D
+	_check(nav_region != null and nav_region.navigation_mesh != null and nav_region.navigation_mesh.get_polygon_count() == 1, "Ashen Vale registers a shared walkable navigation region")
+	var agent := guard.navigation_agent as NavigationAgent3D
+	_check(agent != null, "each sentinel owns a NavigationAgent3D")
+	if agent != null:
+		agent.target_position = Vector3(-12.0, 0.0, -8.0)
+		await physics_frame
+		await physics_frame
+		await physics_frame
+		agent.get_next_path_position()
+		var route: PackedVector3Array = agent.get_current_navigation_path()
+		_check(route.size() >= 2, "sentinel agent computes a route across the valley")
+		if route.size() >= 2:
+			_check(route[route.size() - 1].distance_to(agent.target_position) < 1.0, "global route reaches the requested destination")
+		var routed_direction: Vector3 = guard._get_global_route_direction(Vector3(-12.0, 0.0, -8.0), Vector3.FORWARD)
+		_check(routed_direction.dot(Vector3(-1.0, 0.0, -1.0).normalized()) > 0.95, "AI steering consumes the NavigationAgent route direction")
 	var desired := Vector3.FORWARD
 	var clear_direction: Vector3 = guard._get_navigation_direction(desired)
 	_check(clear_direction.is_equal_approx(desired), "guard keeps its direct route when the probe corridor is clear")
@@ -62,7 +78,7 @@ func _run() -> void:
 	var distant: Vector3 = guard._apply_guard_separation(Vector3.FORWARD)
 	_check(distant.is_equal_approx(Vector3.FORWARD), "sentinels do not influence each other outside the separation radius")
 	if failures.is_empty():
-		print("Guard navigation tests: 9/9 passed")
+		print("Guard navigation tests: 14/14 passed")
 	else:
-		printerr("Guard navigation tests: ", 9 - failures.size(), "/9 passed")
+		printerr("Guard navigation tests: ", 14 - failures.size(), "/14 passed")
 	quit(0 if failures.is_empty() else 1)

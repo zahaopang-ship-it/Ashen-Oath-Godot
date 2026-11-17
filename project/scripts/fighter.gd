@@ -28,6 +28,8 @@ var dodge_speed := 10.0
 @export var attack_posture_damage := 30.0
 
 var target: CharacterBody3D
+var navigation_agent: NavigationAgent3D
+var _navigation_target := Vector3.INF
 var input_move := Vector2.ZERO
 var state: CombatState = CombatState.FREE
 var is_blocking := false
@@ -806,12 +808,37 @@ func _steer_ai_toward(destination: Vector3, speed: float, delta: float, turn_spe
 		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
 		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
 		return
-	var direction := _get_navigation_direction(desired.normalized())
+	var route_direction := _get_global_route_direction(destination, desired.normalized())
+	var direction := _get_navigation_direction(route_direction)
 	direction = _apply_guard_separation(direction)
 	var desired_velocity := direction * speed
 	velocity.x = move_toward(velocity.x, desired_velocity.x, 10.0 * delta)
 	velocity.z = move_toward(velocity.z, desired_velocity.z, 10.0 * delta)
 	_face_direction(direction, delta, turn_speed)
+
+func _get_global_route_direction(destination: Vector3, fallback: Vector3) -> Vector3:
+	if not is_instance_valid(navigation_agent) or not navigation_agent.is_inside_tree():
+		return fallback
+	var map := navigation_agent.get_navigation_map()
+	if map.is_valid() and NavigationServer3D.map_get_iteration_id(map) == 0:
+		return fallback
+	if not _navigation_target.is_finite() or _navigation_target.distance_to(destination) > 0.85:
+		_navigation_target = destination
+		navigation_agent.target_position = destination
+	var next_position := navigation_agent.get_next_path_position()
+	var direction := next_position - global_position
+	direction.y = 0.0
+	if direction.length_squared() < 0.04:
+		var path: PackedVector3Array = navigation_agent.get_current_navigation_path()
+		var path_index := navigation_agent.get_current_navigation_path_index()
+		for index in range(path_index + 1, path.size()):
+			direction = path[index] - global_position
+			direction.y = 0.0
+			if direction.length_squared() >= 0.04:
+				break
+	if direction.length_squared() < 0.04:
+		return fallback
+	return direction.normalized()
 
 func _get_navigation_direction(desired_direction: Vector3, probe_distance: float = 1.9) -> Vector3:
 	var desired := Vector3(desired_direction.x, 0.0, desired_direction.z)

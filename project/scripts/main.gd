@@ -39,6 +39,7 @@ const AUDIO_EVENTS := {
 
 func _ready() -> void:
 	_setup_world()
+	_create_navigation_region()
 	player = _make_fighter("Wolf", Vector3(0, 0, 4), true)
 	boss = _make_fighter("AshenWarlord", Vector3(0, 0, -3), false, true)
 	guard = _make_fighter("AshenSentinel", Vector3(-7.0, 0.0, -1.0), false)
@@ -111,6 +112,25 @@ func _ready() -> void:
 	sun.light_energy = 1.15
 	sun.shadow_enabled = true
 	add_child(sun)
+
+func _create_navigation_region() -> void:
+	var region := NavigationRegion3D.new()
+	region.name = "AshenValeNavigationRegion"
+	var nav_mesh := NavigationMesh.new()
+	nav_mesh.agent_radius = 0.42
+	nav_mesh.agent_height = 1.8
+	nav_mesh.cell_size = 0.5
+	nav_mesh.cell_height = 0.2
+	nav_mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	nav_mesh.vertices = PackedVector3Array([
+		Vector3(-26.4, 0.02, -22.4),
+		Vector3(26.4, 0.02, -22.4),
+		Vector3(26.4, 0.02, 22.4),
+		Vector3(-26.4, 0.02, 22.4)
+	])
+	nav_mesh.add_polygon(PackedInt32Array([0, 1, 2, 3]))
+	region.navigation_mesh = nav_mesh
+	add_child(region)
 
 func _setup_world() -> void:
 	var world_env := WorldEnvironment.new()
@@ -298,6 +318,16 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool, boss_ch
 	collision.shape = capsule
 	collision.position.y = 0.9
 	body.add_child(collision)
+	if not player_controlled and not boss_character:
+		var nav_agent := NavigationAgent3D.new()
+		nav_agent.name = "PatrolNavigationAgent"
+		nav_agent.radius = 0.42
+		nav_agent.height = 1.8
+		nav_agent.path_desired_distance = 0.55
+		nav_agent.target_desired_distance = 0.7
+		nav_agent.avoidance_enabled = false
+		body.add_child(nav_agent)
+		body.navigation_agent = nav_agent
 	body.body_collision = collision
 	var upper_body := Node3D.new()
 	upper_body.name = "UpperBodyPivot"
