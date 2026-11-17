@@ -132,4 +132,16 @@ static func receive_distraction(actor: CharacterBody3D, noise_position: Vector3)
 	actor._search_pause_timer = 0.0
 	actor._search_scan_time = 0.0
 
+static func set_stealth_cover(actor: CharacterBody3D, _zone: Area3D, entering: bool) -> void:
+	actor.stealth_cover_count = maxi(0, actor.stealth_cover_count + (1 if entering else -1))
+	actor.is_in_cover = actor.stealth_cover_count > 0
+
+static func on_cover_zone_body_entered(actor: CharacterBody3D, body: Node3D, zone: Area3D) -> void:
+	if body == actor:
+		set_stealth_cover(actor, zone, true)
+
+static func on_cover_zone_body_exited(actor: CharacterBody3D, body: Node3D, zone: Area3D) -> void:
+	if body == actor:
+		set_stealth_cover(actor, zone, false)
+
 [executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]

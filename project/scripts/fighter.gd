@@ -5,6 +5,7 @@ const STEALTH_AWARENESS = preload("res://scripts/ai/stealth_awareness_controller
 const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
 const TRAVERSAL_CONTROLLER = preload("res://scripts/traversal/fighter_traversal_controller.gd")
 const PROSTHETIC_CONTROLLER = preload("res://scripts/prosthetics/fighter_prosthetic_controller.gd")
+const EXPLORATION_CONTROLLER = preload("res://scripts/exploration/fighter_exploration_controller.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -951,17 +952,17 @@ func _get_target_vision_multiplier(candidate: Node3D) -> float:
 	return STEALTH_AWARENESS.get_target_vision_multiplier(self, candidate)
 
 
-func set_stealth_cover(_zone: Area3D, entering: bool) -> void:
-	stealth_cover_count = maxi(0, stealth_cover_count + (1 if entering else -1))
-	is_in_cover = stealth_cover_count > 0
+func set_stealth_cover(zone: Area3D, entering: bool) -> void:
+	STEALTH_AWARENESS.set_stealth_cover(self, zone, entering)
+
 
 func _on_cover_zone_body_entered(body: Node3D, zone: Area3D) -> void:
-	if body == self:
-		set_stealth_cover(zone, true)
+	STEALTH_AWARENESS.on_cover_zone_body_entered(self, body, zone)
+
 
 func _on_cover_zone_body_exited(body: Node3D, zone: Area3D) -> void:
-	if body == self:
-		set_stealth_cover(zone, false)
+	STEALTH_AWARENESS.on_cover_zone_body_exited(self, body, zone)
+
 
 func _target_in_vision_cone(offset: Vector3) -> bool:
 	return STEALTH_AWARENESS.target_in_vision_cone(self, offset)
@@ -997,6 +998,5 @@ func begin_lightning_reversal() -> bool:
 
 func receive_lightning_reversal(defender: Node3D) -> void:
 	PROSTHETIC_CONTROLLER.receive_lightning_reversal(self, defender)
-
 
 [executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]
