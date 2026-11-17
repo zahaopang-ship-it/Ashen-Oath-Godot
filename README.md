@@ -9,6 +9,7 @@ Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-i
 - Sentinel patrols, vision-cone awareness, noise investigation, physical cover concealment, and multi-point cover investigation after losing sight; guards can escalate again if inspection restores direct line of sight.
 - Four prototype prosthetic tools: forward-arc shuriken (ranged chip damage), firecracker (guard distraction/stagger), close-range axe (heavy vitality/posture impact), and timed umbrella guard. Spirit-emblem energy is displayed in the touch HUD and regenerates gradually; keyboard shortcuts 1–4 mirror the four touch actions.
 - Phase II lightning attack with a long blue telegraph, airborne timed lightning reversal, reflected boss stagger, and emissive lightning arc feedback. Three prototype upgrade tokens let the player cycle through shuriken, firecracker, axe, and umbrella upgrades (keyboard U / touchscreen UPGRADE).
+- One-use player resurrection restores 55% vitality at the configured checkpoint, clears posture, and grants 1.35 seconds of damage immunity. Three glowing grapple anchors support forward-cone targeting, collision-aware arcing movement, and a contextual heavy aerial follow-up (keyboard G/T/Y; touchscreen GRAPPLE/AIR ATTACK/REVIVE).
 - Procedural wall-hug pose leans the torso toward the wall and tucks the weapon arm while preserving the crouched stance.
 - Current validation is headless on Linux; Android export and real-device touch/visual checks are still pending.
 

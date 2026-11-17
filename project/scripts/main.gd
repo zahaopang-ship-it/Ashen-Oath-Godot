@@ -47,8 +47,12 @@ func _ready() -> void:
 	_create_stealth_cover(Vector3(-5.1, 0.0, -3.0), "MossyBushA")
 	_create_stealth_cover(Vector3(-9.2, 0.0, -4.5), "MossyBushB")
 	_create_stealth_cover(Vector3(-5.8, 0.0, -8.6), "SupplyCrates")
+	_create_grapple_point(Vector3(-2.5, 5.2, 0.0), "GrappleAnchorWest")
+	_create_grapple_point(Vector3(2.5, 5.8, -5.5), "GrappleAnchorNorth")
+	_create_grapple_point(Vector3(7.0, 4.8, 1.5), "GrappleAnchorEast")
 	enemy = boss
 	player.target = enemy
+	player.set_checkpoint(Vector3(0.0, 0.0, 4.0))
 	enemy.target = player
 	boss.boss_phase_changed.connect(_on_boss_phase_changed)
 	enemy.attack_phase_changed.connect(_on_enemy_attack_phase)
@@ -502,6 +506,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_4: player.use_prosthetic("umbrella")
 			KEY_R: player.begin_lightning_reversal()
 			KEY_U: player.upgrade_next_prosthetic()
+			KEY_F: player.begin_jump()
+			KEY_G: player.try_grapple()
+			KEY_T: player.aerial_grapple_attack()
+			KEY_Y: player.resurrect()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:
@@ -518,6 +526,33 @@ func _unhandled_input(event: InputEvent) -> void:
 func rotate_camera(delta_x: float, delta_y: float) -> void:
 	camera_yaw -= delta_x * 0.004
 	camera_pitch = clampf(camera_pitch - delta_y * 0.003, -0.65, 0.15)
+
+func _create_grapple_point(pos: Vector3, label: String) -> void:
+	var anchor := Area3D.new()
+	anchor.name = label
+	anchor.position = pos
+	anchor.add_to_group("grapple_points")
+	anchor.monitoring = false
+	add_child(anchor)
+	var orb := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.24
+	mesh.height = 0.48
+	orb.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.18, 0.78, 0.88)
+	material.emission_enabled = true
+	material.emission = Color(0.12, 0.72, 1.0)
+	material.emission_energy_multiplier = 2.2
+	orb.material_override = material
+	anchor.add_child(orb)
+	var ring := MeshInstance3D.new()
+	var ring_mesh := TorusMesh.new()
+	ring_mesh.inner_radius = 0.30
+	ring_mesh.outer_radius = 0.38
+	ring.mesh = ring_mesh
+	ring.material_override = material
+	anchor.add_child(ring)
 
 func _create_stealth_cover(pos: Vector3, label: String) -> void:
 	var cover := StaticBody3D.new()

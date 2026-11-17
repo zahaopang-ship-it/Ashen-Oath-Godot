@@ -126,6 +126,19 @@ var prosthetic_pose_timer := 0.0
 var lightning_reversal_timer := 0.0
 var prosthetic_upgrade_points := 3
 var upgrade_selection_index := 0
+var resurrection_charges := 1
+var max_resurrection_charges := 1
+var resurrection_invulnerability := 0.0
+var resurrection_available := true
+var checkpoint_position := Vector3.ZERO
+var is_grappling := false
+var grapple_target: Node3D
+var _grapple_start := Vector3.ZERO
+var _grapple_end := Vector3.ZERO
+var _grapple_elapsed := 0.0
+var _grapple_duration := 0.48
+var _grapple_height := 1.25
+var _grapple_attack_ready := false
 var prosthetic_upgrades := {"shuriken": 0, "firecracker": 0, "axe": 0, "umbrella": 0}
 
 const WINDUP_TIME := 0.32
@@ -150,6 +163,10 @@ const ATTACK_BUFFER_WINDOW := 0.58
 const COMBO_RESET_TIME := 0.95
 
 func _physics_process(delta: float) -> void:
+	if is_grappling:
+		_update_grapple(delta)
+		_update_combat_animation(delta)
+		return
 	if is_vaulting:
 		_update_vault(delta)
 		_update_combat_animation(delta)
@@ -171,6 +188,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 		return
 	deflect_timer = maxf(0.0, deflect_timer - delta)
+	resurrection_invulnerability = maxf(0.0, resurrection_invulnerability - delta)
 	prosthetic_cooldown = maxf(0.0, prosthetic_cooldown - delta)
 	lightning_reversal_timer = maxf(0.0, lightning_reversal_timer - delta)
 	prosthetic_pose_timer = maxf(0.0, prosthetic_pose_timer - delta)
@@ -1318,9 +1336,12 @@ func _resolve_attack_hit() -> void:
 	attack_hit.emit(target)
 
 func receive_strike(damage: float, posture_damage: float, attacker: Node3D, incoming_kind: String = "slash") -> String:
-	if is_dead or is_dodging:
-		if is_dodging:
-			combat_feedback.emit("evaded", self)
+	if is_dead:
+		return "ignored"
+	if resurrection_invulnerability > 0.0:
+		return "immune"
+	if is_dodging:
+		combat_feedback.emit("evaded", self)
 		return "evaded"
 	if incoming_kind == "lightning" and is_player and lightning_reversal_timer > 0.0 and velocity.y > 0.35:
 		lightning_reversal_timer = 0.0
@@ -1391,13 +1412,122 @@ func _check_posture_break() -> void:
 		combat_feedback.emit("posture_break", self)
 
 func _die() -> void:
+	if is_dead:
+		return
 	is_dead = true
+	if is_player:
+		resurrection_available = resurrection_charges > 0
 	state = CombatState.DEAD
 	attack_phase_changed.emit("finished")
 	is_blocking = false
 	velocity = Vector3.ZERO
 	combat_feedback.emit("death", self)
 	died.emit()
+
+func set_checkpoint(position: Vector3) -> void:
+	checkpoint_position = position
+
+func resurrect() -> bool:
+	if not is_player or not is_dead or not resurrection_available or resurrection_charges <= 0:
+		return false
+	resurrection_charges -= 1
+	resurrection_available = false
+	is_dead = false
+	state = CombatState.FREE
+	vitality = max_vitality * 0.55
+	posture = 0.0
+	velocity = Vector3.ZERO
+	global_position = checkpoint_position
+	is_blocking = false
+	is_deflecting = false
+	is_dodging = false
+	is_crouching = false
+	is_wall_hugging = false
+	is_cover_transferring = false
+	is_grappling = false
+	attack_timer = 0.0
+	attack_buffer_timer = 0.0
+	buffered_attack_kind = ""
+	resurrection_invulnerability = 1.35
+	combat_feedback.emit("resurrection", self)
+	return true
+
+func begin_jump() -> bool:
+	if not is_player or is_dead or state != CombatState.FREE or not is_on_floor() or is_grappling or is_vaulting:
+		return false
+	velocity.y = 7.2
+	is_crouching = false
+	return true
+
+func try_grapple() -> bool:
+	if not is_player or is_dead or state != CombatState.FREE or is_grappling or is_vaulting or is_wall_hugging or is_cover_transferring:
+		return false
+	var best: Node3D = null
+	var best_distance := 12.5
+	var forward := -global_transform.basis.z.normalized()
+	for candidate in get_tree().get_nodes_in_group("grapple_points"):
+		if not candidate is Node3D or not is_instance_valid(candidate):
+			continue
+		var offset: Vector3 = candidate.global_position - global_position
+		var distance := offset.length()
+		if distance < 2.0 or distance > best_distance:
+			continue
+		var direction := offset.normalized()
+		if forward.dot(direction) < 0.48:
+			continue
+		var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.1, candidate.global_position)
+		query.exclude = [get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty() and hit.collider != candidate:
+			continue
+		best = candidate
+		best_distance = distance
+	if not is_instance_valid(best):
+		return false
+	grapple_target = best
+	_grapple_start = global_position
+	_grapple_end = best.global_position + Vector3(0.0, -0.8, 0.0)
+	_grapple_elapsed = 0.0
+	_grapple_duration = clampf(best_distance / 18.0, 0.32, 0.62)
+	_grapple_height = clampf(best_distance * 0.16, 0.8, 1.8)
+	is_grappling = true
+	_grapple_attack_ready = true
+	velocity = Vector3.ZERO
+	return true
+
+func _update_grapple(delta: float) -> void:
+	if not is_instance_valid(grapple_target):
+		is_grappling = false
+		return
+	_grapple_elapsed += delta
+	var t := clampf(_grapple_elapsed / _grapple_duration, 0.0, 1.0)
+	var desired := _grapple_start.lerp(_grapple_end, t) + Vector3.UP * (sin(t * PI) * _grapple_height)
+	var travel := desired - global_position
+	velocity = travel / maxf(delta, 0.001)
+	move_and_slide()
+	if get_slide_collision_count() > 0 and t < 0.92:
+		is_grappling = false
+		grapple_target = null
+		velocity = Vector3.ZERO
+		return
+	if t >= 1.0:
+		is_grappling = false
+		grapple_target = null
+		velocity = Vector3.ZERO
+		_grapple_attack_ready = true
+
+func aerial_grapple_attack() -> bool:
+	if not is_player or is_dead or state != CombatState.FREE or is_grappling or not _grapple_attack_ready or not is_instance_valid(target) or target.is_dead:
+		return false
+	var offset := target.global_position - global_position
+	offset.y = 0.0
+	if offset.length() > 3.1 or offset.length() < 0.1:
+		return false
+	if (-global_transform.basis.z).dot(offset.normalized()) < 0.0:
+		return false
+	_grapple_attack_ready = false
+	start_attack("heavy")
+	return true
 
 func begin_mikiri_counter() -> bool:
 	if is_dead or state != CombatState.FREE:

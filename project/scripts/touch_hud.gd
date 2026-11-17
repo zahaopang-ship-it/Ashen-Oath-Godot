@@ -84,9 +84,12 @@ func _build_ui() -> void:
 	_register_action("UMBRELLA", Vector2(-585, -90), "umbrella", Color(0.24, 0.42, 0.48))
 	_register_action("REVERSAL", Vector2(-275, -330), "reversal", Color(0.12, 0.52, 0.72))
 	_register_action("UPGRADE", Vector2(-195, -330), "upgrade", Color(0.38, 0.48, 0.22))
+	_register_action("GRAPPLE", Vector2(-370, -330), "grapple", Color(0.12, 0.52, 0.62))
+	_register_action("REVIVE", Vector2(-95, -330), "revive", Color(0.62, 0.16, 0.30))
+	_register_action("AIR ATTACK", Vector2(-95, -250), "air_attack", Color(0.52, 0.32, 0.12))
 	var hint := Label.new()
 	hint.text = "C CROUCH  /  V VAULT  /  M CLIMB  /  H WALL-HUG  /  B COVER-TO-COVER"
-	hint.text = "R REVERSAL (AIRBORNE)  /  U UPGRADE NEXT TOOL  /  1-4 PROSTHETICS  /  B COVER"
+	hint.text = "G GRAPPLE  /  T AIR ATTACK  /  Y RESURRECT  /  R REVERSAL  /  U UPGRADE  /  1-4 TOOLS"
 	hint.position = Vector2(28, 154)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -175,7 +178,7 @@ func _action_down(action: String) -> void:
 		"block": game.player.begin_block()
 		"dodge": game.player.dodge()
 		"mikiri": game.player.begin_mikiri_counter()
-		"jump": game.player.begin_sweep_evade()
+		"jump": game.player.begin_jump()
 		"stomp": game.player.stomp_broken_target()
 		"deathblow":
 			if not game.player.stealth_deathblow_target():
@@ -191,6 +194,9 @@ func _action_down(action: String) -> void:
 		"umbrella": game.player.use_prosthetic("umbrella")
 		"reversal": game.player.begin_lightning_reversal()
 		"upgrade": game.player.upgrade_next_prosthetic()
+		"grapple": game.player.try_grapple()
+		"revive": game.player.resurrect()
+		"air_attack": game.player.aerial_grapple_attack()
 
 func _action_up(action: String) -> void:
 	match action:
@@ -213,14 +219,15 @@ func _process(_delta: float) -> void:
 	posture_bar.value = game.player.get_posture_ratio() * 100.0
 	enemy_vitality.value = game.enemy.get_vitality_ratio() * 100.0
 	enemy_posture.value = game.enemy.get_posture_ratio() * 100.0
-	var movement_label := "COVER MOVE" if game.player.is_cover_transferring else ("SPRINT" if game.player.is_sprinting else "WALK")
+	var movement_label := "GRAPPLING" if game.player.is_grappling else ("COVER MOVE" if game.player.is_cover_transferring else ("SPRINT" if game.player.is_sprinting else "WALK"))
 	var execution_prompt := "  /  DEATHBLOW READY" if game.enemy.state == 4 and not game.enemy.is_dead else ""
 	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
 	var awareness_text: String = ["UNAWARE", "SUSPICIOUS", "SEARCHING", "ALERTED"][game.guard.awareness_state]
 	suspicion_bar.value = game.guard.suspicion
 	prosthetic_bar.value = game.player.prosthetic_energy
 	var stealth_label := " / COVERED" if game.player.is_in_cover and game.player.is_crouching else (" / IN COVER" if game.player.is_in_cover else "")
-	status_label.text = "SPIRIT: " + str(roundi(game.player.prosthetic_energy)) + "  UPGRADES: " + str(game.player.prosthetic_upgrade_points) + "  |  PLAYER: " + _state_name(game.player) + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + stealth_label + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
+	var revive_text := "  REVIVE: " + str(game.player.resurrection_charges) if game.player.is_dead else ""
+	status_label.text = "SPIRIT: " + str(roundi(game.player.prosthetic_energy)) + "  UPGRADES: " + str(game.player.prosthetic_upgrade_points) + "  |  PLAYER: " + _state_name(game.player) + revive_text + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + stealth_label + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
 
 func _state_name(fighter: Node) -> String:
 	if fighter.state == 4: return "POSTURE BROKEN"

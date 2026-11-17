@@ -351,3 +351,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added three prototype upgrade tokens and a rotating upgrade selector (keyboard U / touchscreen UPGRADE). Up to three levels per tool: Shuriken damage/posture, Firecracker distraction radius, Axe damage/posture, and Umbrella duration improve; each upgrade reduces that tool's emblem cost by 8% (minimum 8).
 - Added regression coverage for airborne-only activation, timing-window consumption, damage prevention, reflected stagger/VFX, phase-two lightning telegraph, and upgrade spending/selection.
 - Limitation: the upgrade tokens are prototype starting resources, not yet earned from a progression or save system. Lightning is a procedural beam placeholder; no authored lightning animation, sound, or Android device validation yet.
+
+
+## M16 — Resurrection and grappling traversal
+- Added one player resurrection charge. On death, REVIVE becomes available; using it restores 55% vitality, clears posture and transient combat/traversal states, returns the player to the configured checkpoint, consumes the charge, and grants 1.35 seconds of damage immunity. No automatic resurrection or repeated use after charge exhaustion.
+- Added three glowing arena grapple anchors. The player can select the nearest visible anchor in a forward cone up to 12.5 m; an obstructed, behind-player, too-close, or out-of-range anchor is rejected. Grapple traversal follows a timed raised arc using CharacterBody3D movement and collision checks, not teleportation.
+- Completing a grapple arms one contextual heavy aerial follow-up when an enemy is within 3.1 m and in front. Added touch controls and keyboard G (grapple), T (aerial follow-up), Y (resurrection), and F (jump); the existing touch JUMP action now performs a real jump.
+- Tests cover resurrection charge, health/posture restoration, checkpoint return, immunity, non-player rejection, anchor targeting, arc completion, physical displacement, aerial follow-up, and rear-anchor rejection.
+- Limitation: resurrection charge is a prototype per-player resource and does not yet refill from deathblows/rest points or persist in saves. Grapple anchors are fixed test-arena points; there is no rope mesh, swing physics, enemy grapple execution, authored traversal animation, or Android device validation yet.
