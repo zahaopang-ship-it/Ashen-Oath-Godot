@@ -131,10 +131,11 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	arm_material.roughness = 0.86
 	var left_arm := _make_arm_pivot(upper_body, "LeftArmPivot", -0.39, arm_material)
 	var right_arm := _make_arm_pivot(upper_body, "RightArmPivot", 0.39, arm_material)
+	var right_wrist: Node3D = right_arm.get_node("ElbowPivot/WristPivot")
 	var weapon_pivot := Node3D.new()
 	weapon_pivot.name = "WeaponPivot"
-	weapon_pivot.position = Vector3(0.02, -0.84, -0.02)
-	right_arm.add_child(weapon_pivot)
+	weapon_pivot.position = Vector3(0.02, -0.02, -0.02)
+	right_wrist.add_child(weapon_pivot)
 	var blade := MeshInstance3D.new()
 	var blade_mesh := BoxMesh.new()
 	blade_mesh.size = Vector3(0.065, 0.92, 0.075)
@@ -160,7 +161,7 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	leg_material.roughness = 0.9
 	var left_leg := _make_leg_pivot(body, "LeftLegPivot", -0.19, leg_material)
 	var right_leg := _make_leg_pivot(body, "RightLegPivot", 0.19, leg_material)
-	body.set_animation_rig(upper_body, weapon_pivot, left_leg, right_leg, left_arm, right_arm)
+	body.set_animation_rig(upper_body, weapon_pivot, left_leg, right_leg, left_arm, right_arm, left_arm.get_node("ElbowPivot"), right_arm.get_node("ElbowPivot"))
 	if not player_controlled:
 		_add_boss_armor(body, upper_body)
 	return body
@@ -175,27 +176,35 @@ func _make_arm_pivot(parent: Node3D, label: String, x: float, material: Material
 	var upper_arm := MeshInstance3D.new()
 	var upper_shape := CapsuleMesh.new()
 	upper_shape.radius = 0.13
-	upper_shape.height = 0.66
+	upper_shape.height = 0.58
 	upper_arm.mesh = upper_shape
-	upper_arm.position = Vector3(0.0, -0.27, 0.0)
+	upper_arm.position = Vector3(0.0, -0.24, 0.0)
 	upper_arm.material_override = material
 	pivot.add_child(upper_arm)
+	var elbow := Node3D.new()
+	elbow.name = "ElbowPivot"
+	elbow.position = Vector3(0.0, -0.49, 0.0)
+	pivot.add_child(elbow)
 	var forearm := MeshInstance3D.new()
 	var forearm_shape := CapsuleMesh.new()
 	forearm_shape.radius = 0.105
-	forearm_shape.height = 0.56
+	forearm_shape.height = 0.54
 	forearm.mesh = forearm_shape
-	forearm.position = Vector3(0.0, -0.66, -0.015)
+	forearm.position = Vector3(0.0, -0.22, -0.015)
 	forearm.material_override = material
-	pivot.add_child(forearm)
+	elbow.add_child(forearm)
+	var wrist := Node3D.new()
+	wrist.name = "WristPivot"
+	wrist.position = Vector3(0.0, -0.45, -0.025)
+	elbow.add_child(wrist)
 	var hand := MeshInstance3D.new()
 	var hand_shape := SphereMesh.new()
 	hand_shape.radius = 0.12
 	hand_shape.height = 0.22
 	hand.mesh = hand_shape
-	hand.position = Vector3(0.0, -0.92, -0.035)
+	hand.position = Vector3(0.0, -0.015, -0.025)
 	hand.material_override = material
-	pivot.add_child(hand)
+	wrist.add_child(hand)
 	return pivot
 
 func armor_material_for_grip() -> StandardMaterial3D:

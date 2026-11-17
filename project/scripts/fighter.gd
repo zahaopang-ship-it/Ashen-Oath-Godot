@@ -43,6 +43,8 @@ var _left_leg_pivot: Node3D
 var _right_leg_pivot: Node3D
 var _left_arm_pivot: Node3D
 var _right_arm_pivot: Node3D
+var _left_elbow_pivot: Node3D
+var _right_elbow_pivot: Node3D
 var _combat_anim_time := 0.0
 var _gait_phase := 0.0
 var _locomotion_bob := 0.0
@@ -178,13 +180,15 @@ func set_body_material(material: StandardMaterial3D) -> void:
 	if _body_material:
 		_body_material.set_meta("base_color", _body_material.albedo_color)
 
-func set_animation_rig(upper_body: Node3D, weapon_pivot: Node3D, left_leg: Node3D = null, right_leg: Node3D = null, left_arm: Node3D = null, right_arm: Node3D = null) -> void:
+func set_animation_rig(upper_body: Node3D, weapon_pivot: Node3D, left_leg: Node3D = null, right_leg: Node3D = null, left_arm: Node3D = null, right_arm: Node3D = null, left_elbow: Node3D = null, right_elbow: Node3D = null) -> void:
 	_upper_body = upper_body
 	_weapon_pivot = weapon_pivot
 	_left_leg_pivot = left_leg
 	_right_leg_pivot = right_leg
 	_left_arm_pivot = left_arm
 	_right_arm_pivot = right_arm
+	_left_elbow_pivot = left_elbow
+	_right_elbow_pivot = right_elbow
 
 func _update_combat_animation(delta: float) -> void:
 	_combat_anim_time += delta
@@ -363,6 +367,15 @@ func _update_combat_animation(delta: float) -> void:
 		_left_arm_pivot.rotation = _left_arm_pivot.rotation.lerp(left_arm_pose, weight)
 	if is_instance_valid(_right_arm_pivot):
 		_right_arm_pivot.rotation = _right_arm_pivot.rotation.lerp(right_arm_pose, weight)
+	var left_elbow_bend := clampf(absf(left_arm_pose.x) * 0.42 + absf(left_arm_pose.z) * 0.28 + 0.10, 0.08, 0.72)
+	var right_elbow_bend := clampf(absf(right_arm_pose.x) * 0.42 + absf(right_arm_pose.z) * 0.28 + 0.12, 0.08, 0.78)
+	if is_blocking:
+		left_elbow_bend = 0.58
+		right_elbow_bend = 0.66
+	if is_instance_valid(_left_elbow_pivot):
+		_left_elbow_pivot.rotation.x = lerpf(_left_elbow_pivot.rotation.x, left_elbow_bend, weight)
+	if is_instance_valid(_right_elbow_pivot):
+		_right_elbow_pivot.rotation.x = lerpf(_right_elbow_pivot.rotation.x, right_elbow_bend, weight)
 
 func _begin_hit_reaction(attacker: Node3D) -> void:
 	if state == CombatState.POSTURE_BROKEN or is_dead:

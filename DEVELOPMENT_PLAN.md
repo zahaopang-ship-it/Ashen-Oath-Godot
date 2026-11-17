@@ -220,3 +220,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added regression checks confirming both arm pivots respond to attack anticipation and the weapon arm assumes a defensive angle during guard.
 - Headless validation: combat 74/74, boss 22/22, feedback integration 3/3, editor import and main-scene smoke passed.
 - Limitation: these are procedural primitive arm segments and transform poses, not skinned mesh deformation, hand IK, authored animation clips, or Android visual validation. Weapon collision remains the existing gameplay hit-volume system.
+
+## M3 — Independent elbow and wrist articulation
+- Rebuilt each primitive arm as a shoulder pivot, upper-arm segment, independent elbow pivot, forearm segment, and wrist pivot/hand.
+- Reparented the katana grip and blade beneath the right wrist, so the weapon now inherits shoulder and elbow motion instead of being attached directly to the shoulder.
+- Added procedural elbow flex driven by the active arm pose, with a stronger compact bend during guard; attack poses articulate both elbows.
+- Added regression checks for elbow response during attack anticipation and defensive guard.
+- Headless validation: combat 76/76, boss 22/22, feedback integration 3/3, Godot editor import and main-scene smoke passed.
+- Limitation: the rig remains a hierarchy of primitive meshes and Node3D pivots; no skinned character, inverse kinematics, retargeted animation clips, or Android visual/device validation yet.
