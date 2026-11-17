@@ -56,22 +56,24 @@ var dodge_cooldown := 0.0
 var is_sprinting := false
 var sprint_requested := false
 var posture_stomped := false
+var deathblow_executed := false
 
 const WINDUP_TIME := 0.32
 const ACTIVE_TIME := 0.10
 const RECOVERY_TIME := 0.34
 const POSTURE_BREAK_TIME := 1.35
 const HIT_FLASH_COLOR := Color(1.0, 0.72, 0.58)
-const ATTACK_KINDS := ["slash", "thrust", "sweep", "heavy", "grab"]
-const ATTACK_DAMAGE := {"slash": 22.0, "thrust": 27.0, "sweep": 18.0, "heavy": 34.0, "grab": 30.0}
-const ATTACK_POSTURE := {"slash": 30.0, "thrust": 36.0, "sweep": 24.0, "heavy": 46.0, "grab": 12.0}
-const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0.62, "grab": 0.72}
+const ATTACK_KINDS := ["slash", "thrust", "sweep", "heavy", "grab", "ashen_rend"]
+const ATTACK_DAMAGE := {"slash": 22.0, "thrust": 27.0, "sweep": 18.0, "heavy": 34.0, "grab": 30.0, "ashen_rend": 46.0}
+const ATTACK_POSTURE := {"slash": 30.0, "thrust": 36.0, "sweep": 24.0, "heavy": 46.0, "grab": 12.0, "ashen_rend": 58.0}
+const ATTACK_WINDUP := {"slash": 0.32, "thrust": 0.48, "sweep": 0.42, "heavy": 0.62, "grab": 0.72, "ashen_rend": 0.92}
 const ATTACK_HITBOX := {
 	"slash": Vector3(0.95, 1.25, 1.65),
 	"thrust": Vector3(0.52, 1.10, 2.10),
 	"sweep": Vector3(1.45, 0.62, 1.55),
 	"heavy": Vector3(1.00, 1.40, 1.90),
-	"grab": Vector3(0.85, 1.15, 1.45)
+	"grab": Vector3(0.85, 1.15, 1.45),
+	"ashen_rend": Vector3(1.65, 1.45, 2.35)
 }
 const ATTACK_BUFFER_WINDOW := 0.58
 const COMBO_RESET_TIME := 0.95
@@ -188,6 +190,9 @@ func _update_combat_animation(delta: float) -> void:
 			"grab":
 				body_pose = Vector3(-0.25, 0.0, -0.32) * anticipation
 				weapon_pose = Vector3(0.15, 0.0, 0.45) * anticipation
+			"ashen_rend":
+				body_pose = Vector3(-0.62, 0.0, -0.24) * anticipation
+				weapon_pose = Vector3(-2.05, 0.0, -0.82) * anticipation
 	elif state == CombatState.ACTIVE:
 		var progress := 1.0 - clampf(attack_timer / ACTIVE_TIME, 0.0, 1.0)
 		var follow := sin(progress * PI)
@@ -207,6 +212,9 @@ func _update_combat_animation(delta: float) -> void:
 			"grab":
 				body_pose = Vector3(0.42, 0.0, 0.55) * follow
 				weapon_pose = Vector3(-0.25, 0.0, 0.7) * follow
+			"ashen_rend":
+				body_pose = Vector3(0.52, 0.0, 0.72) * follow
+				weapon_pose = Vector3(2.15, 0.0, 1.55) * follow
 	elif state == CombatState.RECOVERY:
 		body_pose = Vector3(0.08, 0.0, 0.08)
 		weapon_pose = Vector3(0.18, 0.0, -0.10)
@@ -493,6 +501,32 @@ func stomp_broken_target() -> bool:
 	if offset.length_squared() > 0.001 and (-global_transform.basis.z).normalized().dot(offset.normalized()) < 0.0:
 		return false
 	return target.receive_stomp(self)
+
+func deathblow_broken_target() -> bool:
+	if is_dead or state != CombatState.FREE or not is_instance_valid(target):
+		return false
+	if target.is_dead or target.state != CombatState.POSTURE_BROKEN or target.deathblow_executed:
+		return false
+	var offset := target.global_position - global_position
+	offset.y = 0.0
+	if offset.length() > 2.35 or offset.length_squared() < 0.001:
+		return false
+	if (-global_transform.basis.z).normalized().dot(offset.normalized()) < 0.35:
+		return false
+	return target.receive_deathblow(self)
+
+func receive_deathblow(attacker: Node3D) -> bool:
+	if is_dead or state != CombatState.POSTURE_BROKEN or deathblow_executed or not is_instance_valid(attacker):
+		return false
+	var offset := attacker.global_position - global_position
+	offset.y = 0.0
+	if offset.length() > 2.8 or offset.length_squared() < 0.001:
+		return false
+	deathblow_executed = true
+	vitality = 0.0
+	combat_feedback.emit("deathblow", self)
+	_die()
+	return true
 
 func receive_stomp(attacker: Node3D) -> bool:
 	if is_dead or state != CombatState.POSTURE_BROKEN or posture_stomped:

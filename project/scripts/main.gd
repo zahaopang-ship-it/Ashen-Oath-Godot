@@ -28,7 +28,8 @@ const AUDIO_EVENTS := {
 	"death": "res://audio/impact_body.wav",
 	"grabbed": "res://audio/impact_body.wav",
 	"stomp": "res://audio/posture_break.wav",
-	"boss_phase": "res://audio/posture_break.wav"
+	"boss_phase": "res://audio/posture_break.wav",
+	"deathblow": "res://audio/sword_deflect.wav"
 }
 
 func _ready() -> void:
@@ -189,6 +190,10 @@ func _on_boss_phase_changed(phase: int) -> void:
 		var material := telegraph_marker.material_override as StandardMaterial3D
 		if material:
 			material.emission_energy_multiplier = 3.2 if phase == 2 else 2.2
+			if phase == 2:
+				material.albedo_color = Color(1.0, 0.035, 0.015)
+				material.emission = Color(1.0, 0.015, 0.005)
+				telegraph_marker.scale = Vector3.ONE * 1.55
 
 func _create_telegraph_marker() -> void:
 	telegraph_marker = MeshInstance3D.new()
@@ -218,7 +223,8 @@ func _on_enemy_telegraph_started(kind: String) -> void:
 		"thrust": Color(1.0, 0.72, 0.08),
 		"sweep": Color(0.18, 0.72, 1.0),
 		"heavy": Color(0.78, 0.12, 1.0),
-		"grab": Color(1.0, 0.92, 0.72)
+		"grab": Color(1.0, 0.92, 0.72),
+		"ashen_rend": Color(1.0, 0.035, 0.015)
 	}
 	material.albedo_color = colors.get(kind, Color(1.0, 0.16, 0.055))
 	material.emission = material.albedo_color
@@ -288,6 +294,9 @@ func _on_combat_feedback(kind: String, source: Node3D) -> void:
 		"boss_phase":
 			hitstop = 0.11
 			shake = 0.58
+		"deathblow":
+			hitstop = 0.16
+			shake = 0.72
 	_trigger_hitstop(hitstop, shake)
 	_play_combat_sound(kind, source.global_position)
 
@@ -338,6 +347,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_I: player.begin_mikiri_counter()
 			KEY_O: player.begin_sweep_evade()
 			KEY_P: player.stomp_broken_target()
+			KEY_E: player.deathblow_broken_target()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:

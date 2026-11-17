@@ -6,11 +6,12 @@ const PHASE_ONE := 1
 const PHASE_TWO := 2
 const PHASE_TWO_THRESHOLD := 0.55
 const PHASE_ONE_PATTERN := ["slash", "thrust", "heavy", "slash"]
-const PHASE_TWO_PATTERN := ["sweep", "grab", "thrust", "heavy"]
+const PHASE_TWO_PATTERN := ["sweep", "grab", "thrust", "ashen_rend"]
 
 var boss_phase := PHASE_ONE
 var pattern_index := 0
 var phase_two_damage_scale := 1.18
+var phase_transition_count := 0
 
 func _ready() -> void:
 	display_name = "Ashen Warlord"
@@ -28,7 +29,10 @@ func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 
 func _enter_phase_two() -> void:
+	if boss_phase != PHASE_ONE:
+		return
 	boss_phase = PHASE_TWO
+	phase_transition_count += 1
 	pattern_index = 0
 	ai_timer = 0.35
 	move_speed = 5.25

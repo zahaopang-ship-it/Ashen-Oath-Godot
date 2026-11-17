@@ -66,8 +66,9 @@ func _build_ui() -> void:
 	_register_action("MIKIRI", Vector2(-275, -70), "mikiri", Color(0.58, 0.25, 0.12))
 	_register_action("JUMP", Vector2(-195, -70), "jump", Color(0.18, 0.42, 0.55))
 	_register_action("STOMP", Vector2(-370, -145), "stomp", Color(0.52, 0.30, 0.12))
+	_register_action("DEATHBLOW", Vector2(-370, -70), "deathblow", Color(0.72, 0.08, 0.08))
 	var hint := Label.new()
-	hint.text = "WASD move  J combo  K deflect  L block  Space dodge  I Mikiri  O jump"
+	hint.text = "WASD move  J combo  K deflect  L block  Space dodge  I Mikiri  O jump  E deathblow"
 	hint.position = Vector2(28, 132)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -158,6 +159,7 @@ func _action_down(action: String) -> void:
 		"mikiri": game.player.begin_mikiri_counter()
 		"jump": game.player.begin_sweep_evade()
 		"stomp": game.player.stomp_broken_target()
+		"deathblow": game.player.deathblow_broken_target()
 
 func _action_up(action: String) -> void:
 	match action:
@@ -181,8 +183,9 @@ func _process(_delta: float) -> void:
 	enemy_vitality.value = game.enemy.get_vitality_ratio() * 100.0
 	enemy_posture.value = game.enemy.get_posture_ratio() * 100.0
 	var movement_label := "SPRINT" if game.player.is_sprinting else "WALK"
+	var execution_prompt := "  /  DEATHBLOW READY" if game.enemy.state == 4 and not game.enemy.is_dead else ""
 	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
-	status_label.text = "PLAYER: " + _state_name(game.player) + " / " + movement_label + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy)
+	status_label.text = "PLAYER: " + _state_name(game.player) + " / " + movement_label + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
 
 func _state_name(fighter: Node) -> String:
 	if fighter.state == 4: return "POSTURE BROKEN"

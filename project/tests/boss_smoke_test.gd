@@ -3,11 +3,13 @@ extends SceneTree
 const BOSS = preload("res://scripts/boss.gd")
 const FIGHTER = preload("res://scripts/fighter.gd")
 var failures := 0
+var checks := 0
 
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _check(value: bool, label: String) -> void:
+	checks += 1
 	if value:
 		print("PASS: ", label)
 	else:
@@ -33,11 +35,11 @@ func _run() -> void:
 	boss.vitality = 230.0
 	boss._physics_process(0.016)
 	_check(boss.boss_phase == 2 and phases == [2], "vitality threshold triggers phase transition once")
-	_check(boss.get_phase_pattern() == ["sweep", "grab", "thrust", "heavy"], "phase two switches to sweep and grab sequence")
+	_check(boss.get_phase_pattern() == ["sweep", "grab", "thrust", "ashen_rend"], "phase two switches to sweep, grab, thrust and signature finisher sequence")
 	_check(boss.move_speed > 4.4 and boss.attack_range > 2.5, "phase two increases aggression and reach")
 	boss.vitality = 50.0
 	boss._physics_process(0.016)
-	_check(phases.size() == 1, "phase transition does not retrigger")
+	_check(phases.size() == 1 and boss.phase_transition_count == 1, "phase transition does not retrigger")
 	boss._die()
 	_check(boss.is_dead, "boss supports the standard terminal death state")
 	var damage_boss := CharacterBody3D.new()
@@ -52,5 +54,52 @@ func _run() -> void:
 	damage_boss.attack_kind = "slash"
 	damage_boss._resolve_attack_hit()
 	_check(is_equal_approx(damage_target.vitality, 74.04), "phase two applies increased boss attack damage")
-	print("Boss tests: ", 9 - failures, "/9 passed")
+	var execution_player := CharacterBody3D.new()
+	execution_player.set_script(FIGHTER)
+	execution_player.is_player = true
+	execution_player.position = Vector3.ZERO
+	root.add_child(execution_player)
+	var execution_boss := CharacterBody3D.new()
+	execution_boss.set_script(BOSS)
+	execution_boss.position = Vector3(0, 0, -1.5)
+	root.add_child(execution_boss)
+	execution_player.target = execution_boss
+	execution_boss.target = execution_player
+	_check(not execution_player.deathblow_broken_target(), "deathblow is rejected before posture break")
+	execution_boss.state = 4
+	execution_boss.posture = execution_boss.max_posture
+	_check(execution_player.deathblow_broken_target(), "deathblow executes a nearby posture-broken boss")
+	_check(execution_boss.is_dead and execution_boss.vitality == 0.0 and execution_boss.deathblow_executed, "deathblow causes one terminal boss execution")
+	_check(not execution_player.deathblow_broken_target() and not execution_boss.receive_deathblow(execution_player), "deathblow cannot be repeated")
+	var distant_player := CharacterBody3D.new()
+	distant_player.set_script(FIGHTER)
+	distant_player.is_player = true
+	root.add_child(distant_player)
+	var distant_boss := CharacterBody3D.new()
+	distant_boss.set_script(BOSS)
+	distant_boss.position = Vector3(0, 0, -4.0)
+	distant_boss.state = 4
+	root.add_child(distant_boss)
+	distant_player.target = distant_boss
+	_check(not distant_player.deathblow_broken_target(), "deathblow requires close execution range")
+	var turned_player := CharacterBody3D.new()
+	turned_player.set_script(FIGHTER)
+	turned_player.is_player = true
+	turned_player.rotation.y = PI
+	root.add_child(turned_player)
+	var turned_boss := CharacterBody3D.new()
+	turned_boss.set_script(BOSS)
+	turned_boss.position = Vector3(0, 0, -1.5)
+	turned_boss.state = 4
+	root.add_child(turned_boss)
+	turned_player.target = turned_boss
+	_check(not turned_player.deathblow_broken_target(), "deathblow requires player to face the broken target")
+	var signature_boss := CharacterBody3D.new()
+	signature_boss.set_script(BOSS)
+	root.add_child(signature_boss)
+	_check(signature_boss.get_phase_pattern().has("ashen_rend") == false, "phase one does not use the phase-two signature attack")
+	signature_boss.boss_phase = 2
+	_check(signature_boss.get_phase_pattern().has("ashen_rend"), "phase two includes the telegraphed Ashen Rend signature attack")
+	_check(signature_boss.start_attack("ashen_rend") and signature_boss.attack_timer == 0.92, "Ashen Rend starts with its longer punishable telegraph")
+	print("Boss tests: ", checks - failures, "/", checks, " passed")
 	quit(1 if failures > 0 else 0)

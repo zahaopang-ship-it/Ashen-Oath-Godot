@@ -101,7 +101,10 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - [x] First boss encounter: Ashen Warlord with two distinct phases, escalating tempo, and phase-specific attack sequences.
 - [x] Boss-specific vitality/posture pools, phase HUD label, and procedural armor silhouette.
 - [x] Headless boss phase transition and pattern tests.
-- [ ] Boss deathblow finisher and authored boss animation set.
+- [x] Contextual deathblow against a nearby posture-broken boss; validates range, facing, posture state, and one-time execution.
+- [x] Phase II signature Ashen Rend: extended telegraph, unique crimson warning, broad heavy hit volume, and distinct procedural anticipation/follow-through.
+- [x] Phase transition feedback: intensified crimson telegraph, hitstop, camera impulse, and spatial cue.
+- [ ] Authored skeletal boss animation set.
 - Deathblow, stealth/aerial deathblow.
 - Resurrection rules.
 - Shuriken, Firecrackers, Axe, Umbrella, lightning reversal, grappling.
@@ -185,3 +188,12 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added a procedural armored silhouette with shoulder plates, chest armor, and crest, plus boss name/phase HUD feedback.
 - Added boss phase transition signal, combat feedback, and dedicated headless test coverage.
 - The boss remains built from primitive geometry and procedural poses; no skeletal boss animations, cinematic deathblow, or Android playtest yet.
+
+
+## M3 — Deathblow and Ashen Warlord signature attack
+- Added a contextual DEATHBLOW touch action and `E` keyboard action. It only succeeds when the target is posture-broken, alive, within execution distance, and in front of the player.
+- A successful deathblow is a one-time terminal execution: it consumes the opportunity, sets vitality to zero, emits dedicated feedback, and enters the existing death state. Repeated, distant, rear-facing, and pre-break attempts are rejected.
+- Added the Phase II-only `ashen_rend` attack to the Warlord's pattern. It has a 0.92-second telegraph, distinct broad hit volume, increased damage/posture pressure, and dedicated procedural windup/follow-through poses.
+- Added a crimson signature telegraph and stronger phase-transition impact feedback.
+- Automated checks cover execution eligibility, one-time death, range/facing validation, phase-specific move selection, and signature telegraph timing.
+- Prototype limitation: deathblow is currently a gameplay state/instant finisher, not a cinematic synchronized animation; authored skeletal animation and physical Android input validation remain outstanding.
