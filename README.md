@@ -2,6 +2,9 @@
 
 Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-inspired combat, not affiliated with FromSoftware or Sekiro.
 
+## Architecture progress
+- Fighter creation is isolated in `scripts/factories/fighter_factory.gd`; it builds the physics body, primitive rig, weapon pivots, optional sentinel navigation agent, and boss armor. `main.gd` now delegates construction to this factory. The combat/AI/traversal logic is still in the existing fighter scripts and is scheduled for incremental decomposition.
+
 ## Current milestone
 - Godot 4.7.2 mobile-first 3D action prototype with Vitality/Posture combat, buffered combos, deflects, Mikiri/sweep counters, hitstop, and a two-phase boss.
 - Procedural third-person arena, primitive articulated fighter rigs, lock-on footwork, directional dodge, and adaptive camera framing.
