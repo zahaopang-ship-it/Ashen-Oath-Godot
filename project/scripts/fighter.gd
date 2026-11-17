@@ -4,6 +4,7 @@ const NAVIGATION_STEERING = preload("res://scripts/ai/sentinel_navigation_steeri
 const STEALTH_AWARENESS = preload("res://scripts/ai/stealth_awareness_controller.gd")
 const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
 const TRAVERSAL_CONTROLLER = preload("res://scripts/traversal/fighter_traversal_controller.gd")
+const PROSTHETIC_CONTROLLER = preload("res://scripts/prosthetics/fighter_prosthetic_controller.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -975,199 +976,40 @@ func emit_noise(noise_position: Vector3, radius: float) -> void:
 
 
 func use_prosthetic(tool: String) -> bool:
-	if not is_player or is_dead or state != CombatState.FREE or is_blocking or prosthetic_cooldown > 0.0:
-		return false
-	var base_costs := {"shuriken": 18.0, "firecracker": 28.0, "axe": 32.0, "umbrella": 24.0}
-	if not base_costs.has(tool):
-		return false
-	var level: int = int(prosthetic_upgrades[tool])
-	var cost := maxf(8.0, float(base_costs[tool]) * (1.0 - 0.08 * float(level)))
-	if prosthetic_energy < cost:
-		return false
-	var succeeded := false
-	match tool:
-		"shuriken":
-			succeeded = _use_shuriken()
-			if succeeded:
-				prosthetic_cooldown = 0.38
-		"firecracker":
-			_use_firecracker()
-			succeeded = true
-			prosthetic_cooldown = 0.75
-		"axe":
-			succeeded = _use_axe()
-			if succeeded:
-				prosthetic_cooldown = 0.72
-		"umbrella":
-			umbrella_timer = 1.25 + 0.22 * float(prosthetic_upgrades["umbrella"])
-			is_blocking = true
-			succeeded = true
-			prosthetic_cooldown = 0.45
-	if succeeded:
-		prosthetic_energy -= cost
-		prosthetic_pose = tool
-		prosthetic_pose_timer = 0.34
-	return succeeded
-	return false
+	return PROSTHETIC_CONTROLLER.use_prosthetic(self, tool)
+
 
 func _use_shuriken() -> bool:
-	if not is_instance_valid(target) or target.is_dead:
-		return false
-	var offset := target.global_position - global_position
-	var flat := Vector3(offset.x, 0.0, offset.z)
-	if flat.length() > 10.0 or flat.length() < 0.1:
-		return false
-	var forward := -global_transform.basis.z
-	forward.y = 0.0
-	if forward.normalized().dot(flat.normalized()) < 0.72:
-		return false
-	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.15, target.global_position + Vector3.UP * 1.0)
-	query.exclude = [get_rid()]
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if not hit.is_empty() and hit.get("collider") != target:
-		return false
-	var level: int = int(prosthetic_upgrades["shuriken"])
-	target.receive_strike(12.0 + 3.0 * level, 20.0 + 4.0 * level, self, "thrust")
-	var projectile := MeshInstance3D.new()
-	projectile.name = "ProstheticShuriken"
-	var blade := SphereMesh.new()
-	blade.radius = 0.085
-	blade.height = 0.17
-	projectile.mesh = blade
-	var blade_material := StandardMaterial3D.new()
-	blade_material.albedo_color = Color(0.58, 0.68, 0.78)
-	blade_material.metallic = 0.82
-	blade_material.emission_enabled = true
-	blade_material.emission = Color(0.18, 0.28, 0.42)
-	projectile.material_override = blade_material
-	var scene_root: Node = get_tree().current_scene if is_instance_valid(get_tree().current_scene) else get_tree().root
-	scene_root.add_child(projectile)
-	projectile.global_position = global_position + Vector3.UP * 1.15 - global_transform.basis.z * 0.55
-	var flight := get_tree().create_tween()
-	flight.tween_property(projectile, "global_position", target.global_position + Vector3.UP * 1.0, 0.16)
-	flight.tween_callback(projectile.queue_free)
-	return true
+	return PROSTHETIC_CONTROLLER.use_shuriken(self)
+
 
 func _use_firecracker() -> void:
-	var burst_position := global_position - global_transform.basis.z * 3.0
-	for listener in get_tree().get_nodes_in_group("stealth_guards"):
-		if not is_instance_valid(listener):
-			continue
-		var firecracker_level: int = int(prosthetic_upgrades["firecracker"])
-		if listener.global_position.distance_to(burst_position) > 10.0 + 1.5 * float(firecracker_level):
-			continue
-		if listener.has_method("receive_distraction"):
-			listener.receive_distraction(burst_position)
-		if listener.state == CombatState.FREE:
-			listener.state = CombatState.HITSTUN
-			listener.hit_reaction_kind = "heavy"
-			listener.hit_reaction_duration = 0.62
-			listener.hit_reaction_timer = 0.62
-	# The brief emissive burst is a gameplay marker, not a finished VFX asset.
-	var flash := MeshInstance3D.new()
-	flash.name = "FirecrackerBurst"
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.62
-	sphere.height = 1.24
-	flash.mesh = sphere
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(1.0, 0.72, 0.22, 0.65)
-	material.emission_enabled = true
-	material.emission = Color(1.0, 0.46, 0.08)
-	material.emission_energy_multiplier = 3.0
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	flash.material_override = material
-	var scene_root: Node = get_tree().current_scene if is_instance_valid(get_tree().current_scene) else get_tree().root
-	scene_root.add_child(flash)
-	flash.global_position = burst_position + Vector3.UP * 0.9
-	var timer := get_tree().create_timer(0.24)
-	timer.timeout.connect(flash.queue_free)
+	PROSTHETIC_CONTROLLER.use_firecracker(self)
+
 
 func _use_axe() -> bool:
-	if not is_instance_valid(target) or target.is_dead:
-		return false
-	var offset := target.global_position - global_position
-	offset.y = 0.0
-	if offset.length() > 3.0 or offset.length() < 0.1:
-		return false
-	if -global_transform.basis.z.dot(offset.normalized()) < 0.35:
-		return false
-	if target.has_method("receive_strike"):
-		var axe_level: int = int(prosthetic_upgrades["axe"])
-		target.receive_strike(18.0 + 5.0 * axe_level, 52.0 + 8.0 * axe_level, self, "heavy")
-	return true
+	return PROSTHETIC_CONTROLLER.use_axe(self)
+
 
 func begin_lightning_reversal() -> bool:
-	if not is_player or is_dead or state != CombatState.FREE or velocity.y < 0.5 or lightning_reversal_timer > 0.0:
-		return false
-	lightning_reversal_timer = 0.85
-	combat_feedback.emit("lightning_ready", self)
-	return true
+	return PROSTHETIC_CONTROLLER.begin_lightning_reversal(self)
+
 
 func receive_lightning_reversal(defender: Node3D) -> void:
-	if is_dead or not is_instance_valid(defender):
-		return
-	_spawn_lightning_arc(defender, Color(0.24, 0.82, 1.0))
-	posture += 82.0
-	_check_posture_break()
-	if state != CombatState.POSTURE_BROKEN:
-		state = CombatState.HITSTUN
-		hit_reaction_kind = "heavy"
-		hit_reaction_duration = 0.72
-		hit_reaction_timer = 0.72
-	combat_feedback.emit("lightning_reversed", self)
+	PROSTHETIC_CONTROLLER.receive_lightning_reversal(self, defender)
+
 
 func _spawn_lightning_arc(other: Node3D, tint: Color) -> void:
-	if not is_instance_valid(other):
-		return
-	var start := global_position + Vector3.UP * 1.2
-	var finish := other.global_position + Vector3.UP * 1.2
-	var direction := finish - start
-	var length := direction.length()
-	if length < 0.1:
-		return
-	var beam := MeshInstance3D.new()
-	beam.name = "LightningArc"
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.045
-	mesh.bottom_radius = 0.075
-	mesh.height = length
-	beam.mesh = mesh
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = tint
-	material.emission_enabled = true
-	material.emission = tint
-	material.emission_energy_multiplier = 4.0
-	beam.material_override = material
-	var scene_root: Node = get_tree().current_scene if is_instance_valid(get_tree().current_scene) else get_tree().root
-	scene_root.add_child(beam)
-	beam.global_position = (start + finish) * 0.5
-	var axis := Vector3.UP.cross(direction.normalized())
-	if axis.length_squared() > 0.001:
-		beam.global_basis = Basis(axis.normalized(), Vector3.UP.angle_to(direction.normalized()))
-	var tween := get_tree().create_tween()
-	tween.tween_property(material, "albedo_color:a", 0.0, 0.16)
-	tween.tween_callback(beam.queue_free)
+	PROSTHETIC_CONTROLLER.spawn_lightning_arc(self, other, tint)
+
 
 func upgrade_next_prosthetic() -> bool:
-	var tools := ["shuriken", "firecracker", "axe", "umbrella"]
-	for offset in range(tools.size()):
-		var index := (upgrade_selection_index + offset) % tools.size()
-		var tool: String = tools[index]
-		if upgrade_prosthetic(tool):
-			upgrade_selection_index = (index + 1) % tools.size()
-			return true
-	return false
+	return PROSTHETIC_CONTROLLER.upgrade_next_prosthetic(self)
+
 
 func upgrade_prosthetic(tool: String) -> bool:
-	if not is_player or is_dead or state != CombatState.FREE or prosthetic_upgrade_points <= 0 or not prosthetic_upgrades.has(tool):
-		return false
-	if int(prosthetic_upgrades[tool]) >= 3:
-		return false
-	prosthetic_upgrades[tool] = int(prosthetic_upgrades[tool]) + 1
-	prosthetic_upgrade_points -= 1
-	return true
+	return PROSTHETIC_CONTROLLER.upgrade_prosthetic(self, tool)
+
 
 func receive_distraction(noise_position: Vector3) -> void:
 	STEALTH_AWARENESS.receive_distraction(self, noise_position)
