@@ -3,7 +3,11 @@
 Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-inspired combat, not affiliated with FromSoftware or Sekiro.
 
 ## Architecture progress
-- Fighter creation is isolated in `scripts/factories/fighter_factory.gd`; it builds the physics body, primitive rig, weapon pivots, optional sentinel navigation agent, and boss armor. `main.gd` now delegates construction to this factory. The combat/AI/traversal logic is still in the existing fighter scripts and is scheduled for incremental decomposition.
+- Fighter creation is isolated in scripts/factories/fighter_factory.gd; it builds the physics body, primitive rig, weapon pivots, optional sentinel navigation agent, and boss armor.
+- Ashen Vale environment construction is isolated in scripts/world/world_builder.gd. The builder owns environment generation and trigger wiring while preserving main-scene node paths and callback compatibility.
+- Desktop debug keyboard mappings are isolated in scripts/input/player_input_router.gd and still invoke the same Fighter action methods used by the touch HUD.
+- Third-person follow framing, drag rotation, telegraph pulsing, camera impulse, and shake are isolated in scripts/camera/combat_camera_rig.gd.
+- main.gd now focuses on encounter orchestration, combat feedback, camera/input orchestration, and connecting runtime systems. The 2,027-line fighter controller remains the largest architectural hotspot; combat, AI/stealth, traversal, prosthetics, and animation need further extraction.
 
 ## Current milestone
 - Godot 4.7.2 mobile-first 3D action prototype with Vitality/Posture combat, buffered combos, deflects, Mikiri/sweep counters, hitstop, and a two-phase boss.
@@ -39,3 +43,5 @@ A milestone is not complete until the project opens in the pinned Godot version,
 - Never overwrite unrelated projects.
 - Keep generated builds in a dedicated builds folder (ignored by Git).
 - Record blockers honestly in logs.
+
+[executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]
