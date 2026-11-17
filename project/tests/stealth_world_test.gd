@@ -83,8 +83,26 @@ func _run() -> void:
 	await physics_frame
 	_check(not player.try_vault(), "vault rejects a full-height wall")
 	_check(not player.is_vaulting, "rejected traversal leaves player in normal movement state")
+	var hug_wall := StaticBody3D.new()
+	hug_wall.position = player.global_position + Vector3(0.0, 0.0, -0.62)
+	game.add_child(hug_wall)
+	var hug_shape := CollisionShape3D.new()
+	var hug_box := BoxShape3D.new()
+	hug_box.size = Vector3(3.0, 2.2, 0.35)
+	hug_shape.shape = hug_box
+	hug_shape.position.y = 1.1
+	hug_wall.add_child(hug_shape)
+	await physics_frame
+	_check(player.toggle_wall_hug(), "player can enter wall-hug mode beside a solid wall")
+	_check(player.is_wall_hugging and player.is_crouching, "wall-hug engages a lowered stealth posture")
+	player.input_move = Vector2(1.0, 0.0)
+	var hug_start := player.global_position
+	for i in range(18):
+		await physics_frame
+	_check(absf(player.global_position.x - hug_start.x) > 0.08, "wall-hug allows lateral movement along the wall")
+	_check(player.toggle_wall_hug() and not player.is_wall_hugging, "wall-hug can be exited on demand")
 	if failures.is_empty():
-		print("Stealth world tests: 14/14 passed")
+		print("Stealth world tests: 18/18 passed")
 	else:
-		printerr("Stealth world tests: ", 14 - failures.size(), "/14 passed")
+		printerr("Stealth world tests: ", 18 - failures.size(), "/18 passed")
 	quit(0 if failures.is_empty() else 1)

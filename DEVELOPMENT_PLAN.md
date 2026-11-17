@@ -302,3 +302,13 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Regression coverage: successful low vault, successful raised-platform mantle, mantle completion at platform height, and rejection of a full-height wall; stealth world suite now has 14 assertions.
 - Headless validation: combat 104/104, boss 22/22, feedback integration 5/5, stealth world 14/14; editor import and main-scene smoke passed; `git diff --check` passed.
 - Limitation: mantle is a procedural eased arc, not an authored ledge-grab/climb animation. Search scanning is a simple yaw sweep. Cover-to-cover snapping, navigation around arbitrary geometry, shadow-pixel detection, and Android touch/device validation remain future work.
+
+
+## M10 — Wall-hug stealth traversal
+- Added contextual wall-hug entry: the player must face a nearby solid wall, and a horizontal surface normal is captured from a physics raycast.
+- While attached, movement is projected along the wall tangent; forward/back input controls approach/separation, and a small planar correction maintains a consistent offset.
+- Wall-hug enforces a lowered crouch posture and disables sprint. The player can exit on demand; if the wall is no longer detected, the mode disengages automatically.
+- Added keyboard H and a touchscreen WALL action. Vault (V) and mantle (M) remain separate traversal actions.
+- Added regression checks for valid wall attachment, stealth posture, lateral movement along the wall, and manual exit.
+- Headless validation: combat 104/104, boss 22/22, feedback integration 5/5, stealth world 18/18; editor import and main-scene smoke passed; `git diff --check` passed.
+- Limitation: wall-hug currently uses a single forward-facing wall probe and does not yet support corner wrapping, cover-to-cover auto-routing, authored wall animations, or Android device validation.

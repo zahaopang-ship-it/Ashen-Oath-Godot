@@ -79,6 +79,9 @@ var _vault_start := Vector3.ZERO
 var _vault_end := Vector3.ZERO
 var _vault_height := 0.82
 var _traversal_kind := "vault"
+var is_wall_hugging := false
+var _wall_hug_normal := Vector3.ZERO
+var _wall_hug_side := 0.0
 var _search_scan_time := 0.0
 var _search_origin_yaw := 0.0
 var body_collision: CollisionShape3D
@@ -507,7 +510,29 @@ func _player_update(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, movement_braking * delta)
 		return
 	var move_dir := _get_player_move_direction()
-	is_sprinting = not is_crouching and (sprint_requested or input_move.length() >= 0.82)
+	if is_wall_hugging:
+		var wall_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.0, global_position + Vector3.UP * 1.0 - _wall_hug_normal * 0.95)
+		wall_query.exclude = [get_rid()]
+		var wall_hit := get_world_3d().direct_space_state.intersect_ray(wall_query)
+		if wall_hit.is_empty():
+			is_wall_hugging = false
+			_wall_hug_normal = Vector3.ZERO
+		else:
+			_wall_hug_normal = (wall_hit.normal as Vector3).normalized()
+			var tangent := Vector3.UP.cross(_wall_hug_normal).normalized()
+			move_dir = tangent * input_move.x + _wall_hug_normal * input_move.y
+			if move_dir.length_squared() > 1.0:
+				move_dir = move_dir.normalized()
+			var wall_distance: float = Vector2(global_position.x - wall_hit.position.x, global_position.z - wall_hit.position.z).length()
+			var correction := clampf(wall_distance - 0.58, -0.8, 0.8)
+			velocity += -_wall_hug_normal * correction * 5.0 * delta
+		if is_wall_hugging:
+			is_crouching = true
+			is_sprinting = false
+		else:
+			is_crouching = false
+	else:
+		is_sprinting = not is_crouching and (sprint_requested or input_move.length() >= 0.82)
 	var current_speed := move_speed * (0.48 if is_crouching else (1.42 if is_sprinting else 1.0))
 	var desired_velocity := move_dir * current_speed
 	var accel := movement_acceleration if move_dir.length_squared() > 0.001 else movement_braking
@@ -611,6 +636,32 @@ func _patrol_update(delta: float) -> void:
 	velocity.z = direction.z * patrol_speed
 	_face_direction(direction, delta, 4.0)
 
+func toggle_wall_hug() -> bool:
+	if not is_player or is_dead or is_vaulting or state != CombatState.FREE:
+		return false
+	if is_wall_hugging:
+		is_wall_hugging = false
+		_wall_hug_normal = Vector3.ZERO
+		return true
+	var forward := -global_transform.basis.z
+	var origin := global_position + Vector3.UP * 1.0
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + forward * 0.95)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return false
+	var normal: Vector3 = hit.normal
+	if absf(normal.y) > 0.25:
+		return false
+	_wall_hug_normal = normal.normalized()
+	_wall_hug_side = signf(global_transform.basis.x.dot(_wall_hug_normal))
+	if is_zero_approx(_wall_hug_side):
+		_wall_hug_side = 1.0
+	is_wall_hugging = true
+	is_crouching = true
+	is_sprinting = false
+	return true
+
 func try_mantle() -> bool:
 	if not is_player or is_dead or is_vaulting or state != CombatState.FREE or not is_on_floor():
 		return false
@@ -646,6 +697,7 @@ func try_mantle() -> bool:
 	_vault_duration = 0.62
 	_vault_height = 0.38
 	_traversal_kind = "mantle"
+	is_wall_hugging = false
 	is_vaulting = true
 	is_crouching = false
 	is_sprinting = false
@@ -684,6 +736,7 @@ func try_vault() -> bool:
 	_vault_duration = 0.42
 	_vault_height = 0.82
 	_traversal_kind = "vault"
+	is_wall_hugging = false
 	is_vaulting = true
 	is_crouching = false
 	is_sprinting = false
