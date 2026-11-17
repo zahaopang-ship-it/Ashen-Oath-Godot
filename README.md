@@ -5,8 +5,9 @@ Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-i
 ## Current milestone
 - Godot 4.7.2 mobile-first 3D action prototype with Vitality/Posture combat, buffered combos, deflects, Mikiri/sweep counters, hitstop, and a two-phase boss.
 - Procedural third-person arena, primitive articulated fighter rigs, lock-on footwork, directional dodge, and adaptive camera framing.
-- Touch HUD with virtual stick, camera drag, combat actions, crouch, stealth deathblow, vault, ledge mantle, and contextual wall-hug traversal with perpendicular corner wrapping.
-- Sentinel patrols, vision-cone awareness, noise investigation, physical cover concealment, and a searching scan after losing sight.
+- Touch HUD with virtual stick, camera drag, combat actions, crouch, stealth deathblow, vault, ledge mantle, wall-hug corner wrapping, and crouched cover-to-cover movement (keyboard B / touchscreen COVER).
+- Sentinel patrols, vision-cone awareness, noise investigation, physical cover concealment, and multi-point cover investigation after losing sight; guards can escalate again if inspection restores direct line of sight.
+- Procedural wall-hug pose leans the torso toward the wall and tucks the weapon arm while preserving the crouched stance.
 - Current validation is headless on Linux; Android export and real-device touch/visual checks are still pending.
 
 ## Roadmap

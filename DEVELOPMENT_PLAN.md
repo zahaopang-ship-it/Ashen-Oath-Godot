@@ -326,3 +326,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - The guard walks to the last known position, then visits nearby bushes/crates in nearest-first order, pausing and scanning at each point before continuing. The route is based on remembered sighting data, not the player's current hidden position.
 - Added regression checks for route composition, memory-only search origin, pause initialization, and actual movement toward the last known location.
 - Limitation: this is a simple waypoint investigation, not full navigation/pathfinding; collision geometry can still obstruct direct travel. It does not guarantee that every prop is reachable. Android device validation remains pending.
+
+
+## M13 — Cover-to-cover stealth traversal and wall-hug pose
+- Added a crouch-only COVER action (keyboard B and touchscreen button) that selects the nearest other concealment zone within 7 m and moves the player there through CharacterBody3D movement. It never teleports; short collision probes choose a lateral detour around the current cover, and the transfer cancels safely if both sides are blocked. Standing up cancels an active transfer.
+- Added a distinct wall-hug procedural pose: torso lean toward the wall, tucked shoulder/weapon arm, and asymmetric foot placement layered over the crouch animation. HUD reports COVER MOVE while traversing.
+- Guard awareness continues updating while investigating cover points. If inspection restores direct vision of an exposed player, normal suspicion escalation can transition the guard back to ALERTED; hidden position is not read from the player's location to create search waypoints.
+- Regression coverage includes crouch requirement, valid cover destination, collision-safe physical movement, arrival inside concealment, visible-player rediscovery, and wall-hug torso/arm pose.
+- Limitation: cover transfer uses local collision probes and one detour, not a global navigation mesh; it may cancel around complex obstacles. Wall pose is procedural, not authored animation. Android device validation remains pending.

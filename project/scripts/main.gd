@@ -494,6 +494,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_V: player.try_vault()
 			KEY_M: player.try_mantle()
 			KEY_H: player.toggle_wall_hug()
+			KEY_B: player.begin_cover_transfer()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:

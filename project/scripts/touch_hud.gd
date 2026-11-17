@@ -74,8 +74,9 @@ func _build_ui() -> void:
 	_register_action("VAULT", Vector2(-475, -250), "vault", Color(0.34, 0.39, 0.28))
 	_register_action("CLIMB", Vector2(-475, -170), "climb", Color(0.28, 0.39, 0.52))
 	_register_action("WALL", Vector2(-475, -90), "wall", Color(0.34, 0.32, 0.48))
+	_register_action("COVER", Vector2(-475, -10), "cover", Color(0.20, 0.38, 0.28))
 	var hint := Label.new()
-	hint.text = "C CROUCH  /  V VAULT  /  M CLIMB  /  H WALL-HUG  /  Hide in cover"
+	hint.text = "C CROUCH  /  V VAULT  /  M CLIMB  /  H WALL-HUG  /  B COVER-TO-COVER"
 	hint.position = Vector2(28, 132)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -173,6 +174,7 @@ func _action_down(action: String) -> void:
 		"vault": game.player.try_vault()
 		"climb": game.player.try_mantle()
 		"wall": game.player.toggle_wall_hug()
+		"cover": game.player.begin_cover_transfer()
 
 func _action_up(action: String) -> void:
 	match action:
@@ -195,7 +197,7 @@ func _process(_delta: float) -> void:
 	posture_bar.value = game.player.get_posture_ratio() * 100.0
 	enemy_vitality.value = game.enemy.get_vitality_ratio() * 100.0
 	enemy_posture.value = game.enemy.get_posture_ratio() * 100.0
-	var movement_label := "SPRINT" if game.player.is_sprinting else "WALK"
+	var movement_label := "COVER MOVE" if game.player.is_cover_transferring else ("SPRINT" if game.player.is_sprinting else "WALK")
 	var execution_prompt := "  /  DEATHBLOW READY" if game.enemy.state == 4 and not game.enemy.is_dead else ""
 	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
 	var awareness_text: String = ["UNAWARE", "SUSPICIOUS", "SEARCHING", "ALERTED"][game.guard.awareness_state]

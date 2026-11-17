@@ -80,6 +80,10 @@ var _vault_end := Vector3.ZERO
 var _vault_height := 0.82
 var _traversal_kind := "vault"
 var is_wall_hugging := false
+var is_cover_transferring := false
+var _cover_transfer_target: Node3D
+var _cover_transfer_detour := Vector3.ZERO
+var _cover_transfer_detouring := false
 var _wall_hug_normal := Vector3.ZERO
 var _wall_hug_side := 0.0
 var _search_scan_time := 0.0
@@ -447,6 +451,17 @@ func _update_combat_animation(delta: float) -> void:
 		left_arm_pose.z += 0.08
 		right_arm_pose.z -= 0.08
 		weapon_pose.x += 0.12
+	if is_wall_hugging:
+		var wall_side := -1.0 if _wall_hug_side < 0.0 else 1.0
+		body_pose.z += wall_side * 0.16
+		body_pose.x += 0.08
+		left_arm_pose.x -= 0.12
+		right_arm_pose.x -= 0.20
+		left_arm_pose.z -= wall_side * 0.10
+		right_arm_pose.z += wall_side * 0.10
+		weapon_pose.z += wall_side * 0.12
+		left_leg_pose += 0.06 * wall_side
+		right_leg_pose -= 0.06 * wall_side
 	if is_vaulting:
 		var vault_progress := clampf(_vault_elapsed / maxf(0.01, _vault_duration), 0.0, 1.0)
 		var tuck := sin(vault_progress * PI)
@@ -513,6 +528,40 @@ func _player_update(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, movement_braking * delta)
 		return
 	var move_dir := _get_player_move_direction()
+	if is_cover_transferring:
+		if not is_instance_valid(_cover_transfer_target):
+			is_cover_transferring = false
+		else:
+			var transfer_goal: Vector3 = _cover_transfer_detour if _cover_transfer_detouring else _cover_transfer_target.global_position
+			var transfer_offset := transfer_goal - global_position
+			transfer_offset.y = 0.0
+			if transfer_offset.length() <= (0.38 if _cover_transfer_detouring else 0.52):
+				if _cover_transfer_detouring:
+					_cover_transfer_detouring = false
+					_cover_transfer_detour = Vector3.ZERO
+				else:
+					is_cover_transferring = false
+					_cover_transfer_target = null
+					velocity.x = 0.0
+					velocity.z = 0.0
+			else:
+				move_dir = transfer_offset.normalized()
+				var probe_motion := move_dir * minf(0.22, transfer_offset.length())
+				if test_move(global_transform, probe_motion):
+					if not _cover_transfer_detouring:
+						var side := Vector3(-move_dir.z, 0.0, move_dir.x)
+						if test_move(global_transform, side * 0.45):
+							side = -side
+						if test_move(global_transform, side * 0.45):
+							_cancel_cover_transfer()
+						else:
+							_cover_transfer_detour = global_position + side * 1.9
+							_cover_transfer_detour.y = global_position.y
+							_cover_transfer_detouring = true
+							move_dir = side
+					else:
+						_cancel_cover_transfer()
+						move_dir = Vector3.ZERO
 	if is_wall_hugging:
 		var wall_query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.0, global_position + Vector3.UP * 1.0 - _wall_hug_normal * 0.95)
 		wall_query.exclude = [get_rid()]
@@ -682,6 +731,40 @@ func _try_wall_corner_transition(tangent_direction: Vector3) -> bool:
 	_wall_hug_normal = next_normal
 	return true
 
+func _cancel_cover_transfer() -> void:
+	is_cover_transferring = false
+	_cover_transfer_target = null
+	_cover_transfer_detouring = false
+	_cover_transfer_detour = Vector3.ZERO
+
+func begin_cover_transfer(max_distance: float = 7.0) -> bool:
+	if not is_player or is_dead or state != CombatState.FREE or is_vaulting or is_wall_hugging or is_cover_transferring:
+		return false
+	if not is_crouching:
+		return false
+	var nearest: Area3D
+	var nearest_distance := max_distance
+	for candidate in get_tree().get_nodes_in_group("stealth_cover_zones"):
+		if not is_instance_valid(candidate):
+			continue
+		var point: Vector3 = candidate.global_position
+		var offset := point - global_position
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance < 1.8 or distance >= nearest_distance:
+			continue
+		nearest = candidate
+		nearest_distance = distance
+	if not is_instance_valid(nearest):
+		return false
+	_cover_transfer_target = nearest
+	_cover_transfer_detouring = false
+	_cover_transfer_detour = Vector3.ZERO
+	is_cover_transferring = true
+	sprint_requested = false
+	is_sprinting = false
+	return true
+
 func toggle_wall_hug() -> bool:
 	if not is_player or is_dead or is_vaulting or state != CombatState.FREE:
 		return false
@@ -804,6 +887,8 @@ func _update_vault(delta: float) -> void:
 func set_crouching(enabled: bool) -> void:
 	if not is_player or is_dead or state != CombatState.FREE:
 		return
+	if not enabled and is_cover_transferring:
+		_cancel_cover_transfer()
 	is_crouching = enabled
 	if is_instance_valid(body_collision) and body_collision.shape is CapsuleShape3D:
 		var capsule := body_collision.shape as CapsuleShape3D

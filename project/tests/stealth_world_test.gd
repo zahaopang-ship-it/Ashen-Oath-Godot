@@ -47,6 +47,24 @@ func _run() -> void:
 	await physics_frame
 	_check(not player.is_in_cover, "leaving cover zone restores normal visibility")
 	player.global_position = Vector3(0.0, 0.0, 4.0)
+	player.global_position = get_nodes_in_group("stealth_cover_zones")[1].global_position
+	player.set_crouching(false)
+	_check(not player.begin_cover_transfer(), "cover transfer requires crouching")
+	player.set_crouching(true)
+	var transfer_start := player.global_position
+	_check(player.begin_cover_transfer(), "crouched player selects a nearby cover destination")
+	_check(player.is_cover_transferring and is_instance_valid(player._cover_transfer_target), "cover transfer stores a valid destination")
+	for i in range(240):
+		await physics_frame
+		if not player.is_cover_transferring:
+			break
+	_check(not player.is_cover_transferring and player.is_crouching, "cover transfer completes while crouched")
+	_check(player.global_position.distance_to(transfer_start) > 1.5, "cover transfer uses physical movement")
+	_check(player.is_in_cover, "cover transfer arrives inside a registered concealment zone")
+	player.set_crouching(false)
+	player.global_position = Vector3(0.0, 0.0, 4.0)
+	player.velocity = Vector3.ZERO
+	player.input_move = Vector2.ZERO
 	player.rotation.y = 0.0
 	await physics_frame
 	await physics_frame
@@ -110,6 +128,22 @@ func _run() -> void:
 	for i in range(18):
 		await physics_frame
 	_check(absf(player.global_position.x - hug_start.x) > 0.08, "wall-hug allows lateral movement along the wall")
+	var upper_pose := Node3D.new()
+	var weapon_pose := Node3D.new()
+	var left_leg_pose := Node3D.new()
+	var right_leg_pose := Node3D.new()
+	var left_arm_pose := Node3D.new()
+	var right_arm_pose := Node3D.new()
+	player.add_child(upper_pose)
+	player.add_child(weapon_pose)
+	player.add_child(left_leg_pose)
+	player.add_child(right_leg_pose)
+	player.add_child(left_arm_pose)
+	player.add_child(right_arm_pose)
+	player.set_animation_rig(upper_pose, weapon_pose, left_leg_pose, right_leg_pose, left_arm_pose, right_arm_pose)
+	player._update_combat_animation(0.2)
+	_check(absf(upper_pose.rotation.z) > 0.08, "wall-hug animation leans the torso toward the wall")
+	_check(right_arm_pose.rotation.x < -0.1, "wall-hug animation tucks the weapon arm close to the body")
 	_check(player.toggle_wall_hug() and not player.is_wall_hugging, "wall-hug can be exited on demand")
 	var corner_wall := StaticBody3D.new()
 	corner_wall.position = player.global_position + Vector3(0.5, 0.0, 0.0)
@@ -124,8 +158,19 @@ func _run() -> void:
 	player._wall_hug_normal = Vector3(0.0, 0.0, 1.0)
 	_check(player._try_wall_corner_transition(Vector3.RIGHT), "wall-hug detects an adjacent perpendicular wall at a corner")
 	_check(absf(player._wall_hug_normal.x) > 0.9, "wall-hug updates its normal to follow the new wall plane")
+	player.global_position = zone.global_position
+	player.set_crouching(true)
+	guard.global_position = player.global_position + Vector3(0.0, 0.0, 1.45)
+	guard.rotation.y = 0.0
+	guard.awareness_state = guard.AwarenessState.IDLE
+	guard.suspicion = 0.0
+	guard.lost_sight_timer = 0.0
+	_check(guard._has_clear_line_of_sight(player), "guard can see a crouched player exposed at the edge of cover")
+	for i in range(90):
+		guard._update_awareness(0.1)
+	_check(guard.awareness_state == guard.AwarenessState.ALERTED, "guard escalates when its cover inspection gains direct sight of the player")
 	if failures.is_empty():
-		print("Stealth world tests: 24/24 passed")
+		print("Stealth world tests: 34/34 passed")
 	else:
-		printerr("Stealth world tests: ", 24 - failures.size(), "/24 passed")
+		printerr("Stealth world tests: ", 34 - failures.size(), "/34 passed")
 	quit(0 if failures.is_empty() else 1)
