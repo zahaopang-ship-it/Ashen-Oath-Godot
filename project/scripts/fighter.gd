@@ -1,4 +1,7 @@
 extends CharacterBody3D
+
+const NAVIGATION_STEERING = preload("res://scripts/ai/sentinel_navigation_steering.gd")
+const STEALTH_AWARENESS = preload("res://scripts/ai/stealth_awareness_controller.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -802,96 +805,20 @@ func _patrol_update(delta: float) -> void:
 	_steer_ai_toward(waypoint, patrol_speed, delta, 4.0)
 
 func _steer_ai_toward(destination: Vector3, speed: float, delta: float, turn_speed: float) -> void:
-	var desired := destination - global_position
-	desired.y = 0.0
-	if desired.length_squared() < 0.0025:
-		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
-		return
-	var route_direction := _get_global_route_direction(destination, desired.normalized())
-	var direction := _get_navigation_direction(route_direction)
-	direction = _apply_guard_separation(direction)
-	var desired_velocity := direction * speed
-	velocity.x = move_toward(velocity.x, desired_velocity.x, 10.0 * delta)
-	velocity.z = move_toward(velocity.z, desired_velocity.z, 10.0 * delta)
-	_face_direction(direction, delta, turn_speed)
+	NAVIGATION_STEERING.steer_toward(self, destination, speed, delta, turn_speed)
+
 
 func _get_global_route_direction(destination: Vector3, fallback: Vector3) -> Vector3:
-	if not is_instance_valid(navigation_agent) or not navigation_agent.is_inside_tree():
-		return fallback
-	var map := navigation_agent.get_navigation_map()
-	if map.is_valid() and NavigationServer3D.map_get_iteration_id(map) == 0:
-		return fallback
-	if not _navigation_target.is_finite() or _navigation_target.distance_to(destination) > 0.85:
-		_navigation_target = destination
-		navigation_agent.target_position = destination
-	var next_position := navigation_agent.get_next_path_position()
-	var direction := next_position - global_position
-	direction.y = 0.0
-	if direction.length_squared() < 0.04:
-		var path: PackedVector3Array = navigation_agent.get_current_navigation_path()
-		var path_index := navigation_agent.get_current_navigation_path_index()
-		for index in range(path_index + 1, path.size()):
-			direction = path[index] - global_position
-			direction.y = 0.0
-			if direction.length_squared() >= 0.04:
-				break
-	if direction.length_squared() < 0.04:
-		return fallback
-	return direction.normalized()
+	return NAVIGATION_STEERING.get_global_route_direction(self, destination, fallback)
+
 
 func _get_navigation_direction(desired_direction: Vector3, probe_distance: float = 1.9) -> Vector3:
-	var desired := Vector3(desired_direction.x, 0.0, desired_direction.z)
-	if desired.length_squared() < 0.001:
-		return Vector3.ZERO
-	desired = desired.normalized()
-	if not is_inside_tree() or get_world_3d() == null:
-		return desired
-	var origin := global_position - Vector3.UP * 0.55
-	var space := get_world_3d().direct_space_state
-	var forward_query := PhysicsRayQueryParameters3D.create(origin, origin + desired * probe_distance)
-	forward_query.exclude = [get_rid()]
-	if space.intersect_ray(forward_query).is_empty():
-		return desired
-	var best_direction := desired
-	var best_score := -INF
-	for angle in [-1.15, 1.15, -0.72, 0.72, -1.62, 1.62]:
-		var candidate := desired.rotated(Vector3.UP, angle).normalized()
-		var query := PhysicsRayQueryParameters3D.create(origin, origin + candidate * probe_distance)
-		query.exclude = [get_rid()]
-		var hit := space.intersect_ray(query)
-		var clearance := probe_distance if hit.is_empty() else origin.distance_to(hit.position)
-		var alignment := candidate.dot(desired)
-		var score := alignment * 1.35 + (clearance / probe_distance) * 0.9
-		if score > best_score:
-			best_score = score
-			best_direction = candidate
-	return best_direction
+	return NAVIGATION_STEERING.get_navigation_direction(self, desired_direction, probe_distance)
 
 
 func _apply_guard_separation(travel_direction: Vector3, radius: float = 2.4) -> Vector3:
-	var result := Vector3(travel_direction.x, 0.0, travel_direction.z)
-	if result.length_squared() < 0.001 or not is_inside_tree():
-		return result.normalized() if result.length_squared() > 0.001 else Vector3.ZERO
-	var separation := Vector3.ZERO
-	var neighbors := 0
-	for node in get_tree().get_nodes_in_group("stealth_guards"):
-		if node == self or not node is CharacterBody3D:
-			continue
-		var offset: Vector3 = global_position - (node as CharacterBody3D).global_position
-		offset.y = 0.0
-		var distance := offset.length()
-		if distance > 0.05 and distance < radius:
-			var weight := (radius - distance) / radius
-			separation += offset.normalized() * weight
-			neighbors += 1
-	if neighbors == 0 or separation.length_squared() < 0.001:
-		return result.normalized()
-	separation /= float(neighbors)
-	var combined := result.normalized() + separation * 1.35
-	if combined.length_squared() < 0.001:
-		return result.normalized()
-	return combined.normalized()
+	return NAVIGATION_STEERING.apply_guard_separation(self, travel_direction, radius)
+
 
 func _try_wall_corner_transition(tangent_direction: Vector3) -> bool:
 	if tangent_direction.length_squared() < 0.5 or _wall_hug_normal.length_squared() < 0.5:
@@ -1085,83 +1012,16 @@ func toggle_crouch() -> void:
 	set_crouching(not is_crouching)
 
 func _update_awareness(delta: float) -> void:
-	if not is_instance_valid(target) or target.is_dead:
-		return
-	var offset := target.global_position - global_position
-	offset.y = 0.0
-	var distance := offset.length()
-	var crouched: bool = bool(target.get("is_crouching"))
-	var in_cover: bool = bool(target.get("is_in_cover"))
-	var effective_vision := vision_range * _get_target_vision_multiplier(target)
-	var visible := distance <= effective_vision and _target_in_vision_cone(offset) and _has_clear_line_of_sight(target)
-	var noise_multiplier := 0.42 if crouched else 1.0
-	var noisy: bool = (bool(target.get("is_sprinting")) or (not crouched and Vector2(target.velocity.x, target.velocity.z).length() > 3.2)) and distance <= sprint_noise_range * noise_multiplier
-	if _distraction_active and not visible:
-		return
-	if visible:
-		_distraction_active = false
-		last_known_target_position = target.global_position
-		lost_sight_timer = 0.0
-		if awareness_state == AwarenessState.IDLE or awareness_state == AwarenessState.SEARCHING:
-			awareness_state = AwarenessState.SUSPICIOUS
-		if awareness_state == AwarenessState.SUSPICIOUS:
-			var suspicion_rate := 0.48 if crouched else (1.8 if distance < 4.0 else 1.0)
-			if in_cover:
-				suspicion_rate *= 0.32 if crouched else 0.72
-			suspicion += delta * suspicion_rate
-			if suspicion >= suspicion_threshold:
-				awareness_state = AwarenessState.ALERTED
-				ai_timer = 0.25
-	elif noisy and awareness_state != AwarenessState.ALERTED:
-		last_known_target_position = target.global_position
-		awareness_state = AwarenessState.SUSPICIOUS
-		suspicion = minf(suspicion_threshold, suspicion + delta * 1.5)
-	else:
-		if awareness_state == AwarenessState.SUSPICIOUS:
-			suspicion = maxf(0.0, suspicion - delta * 0.45)
-			if suspicion <= 0.0:
-				awareness_state = AwarenessState.IDLE
-		elif awareness_state == AwarenessState.ALERTED:
-			lost_sight_timer += delta
-			if lost_sight_timer >= 4.0:
-				awareness_state = AwarenessState.SEARCHING
-				search_timer = 12.0
-				_search_origin_yaw = rotation.y
-				_search_scan_time = 0.0
-				_begin_cover_search()
+	STEALTH_AWARENESS.update_awareness(self, delta)
+
 
 func _begin_cover_search() -> void:
-	_search_points.clear()
-	_search_point_index = 0
-	_search_pause_timer = 0.85
-	_search_points.append(last_known_target_position)
-	var candidates: Array[Vector3] = []
-	for zone in get_tree().get_nodes_in_group("stealth_cover_zones"):
-		if not is_instance_valid(zone):
-			continue
-		var point: Vector3 = zone.global_position
-		var offset := point - last_known_target_position
-		offset.y = 0.0
-		if offset.length() <= 6.5:
-			candidates.append(point)
-	candidates.sort_custom(func(a: Vector3, b: Vector3) -> bool:
-		return Vector2(a.x - last_known_target_position.x, a.z - last_known_target_position.z).length_squared() < Vector2(b.x - last_known_target_position.x, b.z - last_known_target_position.z).length_squared()
-	)
-	for point in candidates:
-		_search_points.append(point)
+	STEALTH_AWARENESS.begin_cover_search(self)
+
 
 func _get_target_vision_multiplier(candidate: Node3D) -> float:
-	if not is_instance_valid(candidate):
-		return 1.0
-	var crouched: bool = bool(candidate.get("is_crouching"))
-	var covered: bool = bool(candidate.get("is_in_cover"))
-	if crouched and covered:
-		return 0.16
-	if covered:
-		return 0.58
-	if crouched:
-		return 0.52
-	return 1.0
+	return STEALTH_AWARENESS.get_target_vision_multiplier(self, candidate)
+
 
 func set_stealth_cover(_zone: Area3D, entering: bool) -> void:
 	stealth_cover_count = maxi(0, stealth_cover_count + (1 if entering else -1))
@@ -1176,32 +1036,15 @@ func _on_cover_zone_body_exited(body: Node3D, zone: Area3D) -> void:
 		set_stealth_cover(zone, false)
 
 func _target_in_vision_cone(offset: Vector3) -> bool:
-	if offset.length_squared() < 0.001:
-		return true
-	var forward := -global_transform.basis.z
-	forward.y = 0.0
-	if forward.length_squared() < 0.001:
-		return false
-	var threshold := cos(deg_to_rad(vision_half_angle_degrees))
-	return forward.normalized().dot(offset.normalized()) >= threshold
+	return STEALTH_AWARENESS.target_in_vision_cone(self, offset)
+
 
 func _has_clear_line_of_sight(candidate: Node3D) -> bool:
-	var world := get_world_3d()
-	if world == null:
-		return true
-	var target_height := 0.55 if bool(candidate.get("is_crouching")) else 1.0
-	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.35, candidate.global_position + Vector3.UP * target_height)
-	query.exclude = [get_rid()]
-	var hit := world.direct_space_state.intersect_ray(query)
-	return hit.is_empty() or hit.get("collider") == candidate
+	return STEALTH_AWARENESS.has_clear_line_of_sight(self, candidate)
+
 
 func emit_noise(noise_position: Vector3, radius: float) -> void:
-	if is_player or is_dead or awareness_state == AwarenessState.ALERTED:
-		return
-	if global_position.distance_to(noise_position) <= radius:
-		last_known_target_position = noise_position
-		awareness_state = AwarenessState.SUSPICIOUS
-		suspicion = minf(suspicion_threshold, suspicion + 0.55)
+	STEALTH_AWARENESS.emit_noise(self, noise_position, radius)
 
 
 func use_prosthetic(tool: String) -> bool:
@@ -1400,20 +1243,8 @@ func upgrade_prosthetic(tool: String) -> bool:
 	return true
 
 func receive_distraction(noise_position: Vector3) -> void:
-	if is_player or is_dead:
-		return
-	if awareness_state == AwarenessState.ALERTED and is_instance_valid(target) and _has_clear_line_of_sight(target):
-		return
-	_distraction_active = true
-	_distraction_timer = 7.0
-	last_known_target_position = noise_position
-	awareness_state = AwarenessState.SEARCHING
-	suspicion = maxf(suspicion, 0.55)
-	search_timer = 7.0
-	_search_points = [noise_position]
-	_search_point_index = 0
-	_search_pause_timer = 0.0
-	_search_scan_time = 0.0
+	STEALTH_AWARENESS.receive_distraction(self, noise_position)
+
 
 func _face_direction(dir: Vector3, delta: float, turn_speed: float = 12.0) -> void:
 	if dir.length_squared() < 0.001:
