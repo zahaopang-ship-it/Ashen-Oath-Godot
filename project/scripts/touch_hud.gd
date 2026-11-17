@@ -33,7 +33,7 @@ func _build_ui() -> void:
 	enemy_vitality = _make_bar(root, Vector2(500, 36), Vector2(280, 14), Color(0.62, 0.12, 0.10))
 	enemy_posture = _make_bar(root, Vector2(500, 55), Vector2(280, 9), Color(0.83, 0.61, 0.18))
 	var enemy_label := Label.new()
-	enemy_label.text = "ASHIGARU"
+	enemy_label.text = "ASHEN WARLORD  /  BOSS"
 	enemy_label.position = Vector2(500, 10)
 	enemy_label.add_theme_font_size_override("font_size", 15)
 	root.add_child(enemy_label)
@@ -181,7 +181,8 @@ func _process(_delta: float) -> void:
 	enemy_vitality.value = game.enemy.get_vitality_ratio() * 100.0
 	enemy_posture.value = game.enemy.get_posture_ratio() * 100.0
 	var movement_label := "SPRINT" if game.player.is_sprinting else "WALK"
-	status_label.text = "PLAYER: " + _state_name(game.player) + " / " + movement_label + "   |   ENEMY: " + _state_name(game.enemy)
+	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
+	status_label.text = "PLAYER: " + _state_name(game.player) + " / " + movement_label + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy)
 
 func _state_name(fighter: Node) -> String:
 	if fighter.state == 4: return "POSTURE BROKEN"

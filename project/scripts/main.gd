@@ -1,8 +1,10 @@
 extends Node3D
 const FIGHTER_SCRIPT = preload("res://scripts/fighter.gd")
+const BOSS_SCRIPT = preload("res://scripts/boss.gd")
 const HUD_SCRIPT = preload("res://scripts/touch_hud.gd")
 var player: CharacterBody3D
 var enemy: CharacterBody3D
+var boss: CharacterBody3D
 var camera: Camera3D
 var arena_radius := 13.0
 var camera_yaw := 0.0
@@ -25,15 +27,18 @@ const AUDIO_EVENTS := {
 	"posture_break": "res://audio/posture_break.wav",
 	"death": "res://audio/impact_body.wav",
 	"grabbed": "res://audio/impact_body.wav",
-	"stomp": "res://audio/posture_break.wav"
+	"stomp": "res://audio/posture_break.wav",
+	"boss_phase": "res://audio/posture_break.wav"
 }
 
 func _ready() -> void:
 	_setup_world()
 	player = _make_fighter("Wolf", Vector3(0, 0, 4), true)
-	enemy = _make_fighter("Ashigaru", Vector3(0, 0, -3), false)
+	boss = _make_fighter("AshenWarlord", Vector3(0, 0, -3), false)
+	enemy = boss
 	player.target = enemy
 	enemy.target = player
+	boss.boss_phase_changed.connect(_on_boss_phase_changed)
 	enemy.attack_phase_changed.connect(_on_enemy_attack_phase)
 	enemy.telegraph_started.connect(_on_enemy_telegraph_started)
 	enemy.attack_hit.connect(_on_enemy_attack_hit)
@@ -85,7 +90,7 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	var body := CharacterBody3D.new()
 	body.name = label
 	body.position = pos
-	body.set_script(FIGHTER_SCRIPT)
+	body.set_script(FIGHTER_SCRIPT if player_controlled else BOSS_SCRIPT)
 	body.is_player = player_controlled
 	body.display_name = label
 	add_child(body)
@@ -106,7 +111,7 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	mesh.mesh = capsule_mesh
 	mesh.position.y = 0.9
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.16, 0.24, 0.31) if player_controlled else Color(0.48, 0.16, 0.12)
+	mat.albedo_color = Color(0.16, 0.24, 0.31) if player_controlled else Color(0.20, 0.075, 0.065)
 	mat.roughness = 0.82
 	mesh.name = "BodyMesh"
 	mesh.material_override = mat
@@ -136,7 +141,54 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	blade.material_override = blade_mat
 	weapon_pivot.add_child(blade)
 	body.set_animation_rig(upper_body, weapon_pivot)
+	if not player_controlled:
+		_add_boss_armor(body, upper_body)
 	return body
+
+func _add_boss_armor(body: CharacterBody3D, upper_body: Node3D) -> void:
+	var armor := StandardMaterial3D.new()
+	armor.albedo_color = Color(0.105, 0.12, 0.14)
+	armor.metallic = 0.72
+	armor.roughness = 0.48
+	var trim := StandardMaterial3D.new()
+	trim.albedo_color = Color(0.48, 0.19, 0.075)
+	trim.metallic = 0.58
+	for side in [-1.0, 1.0]:
+		var shoulder := MeshInstance3D.new()
+		var plate := BoxMesh.new()
+		plate.size = Vector3(0.62, 0.34, 0.58)
+		shoulder.mesh = plate
+		shoulder.position = Vector3(side * 0.48, 1.52, 0.0)
+		shoulder.material_override = armor
+		upper_body.add_child(shoulder)
+		var trim_line := MeshInstance3D.new()
+		var trim_mesh := BoxMesh.new()
+		trim_mesh.size = Vector3(0.64, 0.055, 0.60)
+		trim_line.mesh = trim_mesh
+		trim_line.position = Vector3(side * 0.48, 1.70, 0.0)
+		trim_line.material_override = trim
+		upper_body.add_child(trim_line)
+	var chest := MeshInstance3D.new()
+	var chest_mesh := BoxMesh.new()
+	chest_mesh.size = Vector3(0.72, 0.58, 0.24)
+	chest.mesh = chest_mesh
+	chest.position = Vector3(0.0, 1.18, -0.34)
+	chest.material_override = armor
+	upper_body.add_child(chest)
+	var crest := MeshInstance3D.new()
+	var crest_mesh := BoxMesh.new()
+	crest_mesh.size = Vector3(0.12, 0.52, 0.12)
+	crest.mesh = crest_mesh
+	crest.position = Vector3(0.0, 2.35, -0.02)
+	crest.rotation.z = -0.18
+	crest.material_override = trim
+	upper_body.add_child(crest)
+
+func _on_boss_phase_changed(phase: int) -> void:
+	if is_instance_valid(telegraph_marker):
+		var material := telegraph_marker.material_override as StandardMaterial3D
+		if material:
+			material.emission_energy_multiplier = 3.2 if phase == 2 else 2.2
 
 func _create_telegraph_marker() -> void:
 	telegraph_marker = MeshInstance3D.new()
@@ -233,6 +285,9 @@ func _on_combat_feedback(kind: String, source: Node3D) -> void:
 		"stomp":
 			hitstop = 0.085
 			shake = 0.42
+		"boss_phase":
+			hitstop = 0.11
+			shake = 0.58
 	_trigger_hitstop(hitstop, shake)
 	_play_combat_sound(kind, source.global_position)
 

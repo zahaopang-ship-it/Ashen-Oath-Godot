@@ -98,7 +98,10 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Gate: no stuck states; each attack type has a valid counter and punish path.
 
 ### M3 — Boss and signature mechanics
-- Boss multi-phase state machine and telegraphs.
+- [x] First boss encounter: Ashen Warlord with two distinct phases, escalating tempo, and phase-specific attack sequences.
+- [x] Boss-specific vitality/posture pools, phase HUD label, and procedural armor silhouette.
+- [x] Headless boss phase transition and pattern tests.
+- [ ] Boss deathblow finisher and authored boss animation set.
 - Deathblow, stealth/aerial deathblow.
 - Resurrection rules.
 - Shuriken, Firecrackers, Axe, Umbrella, lightning reversal, grappling.
@@ -173,3 +176,12 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Full virtual-stick deflection now produces sprint speed; desktop debug input supports Shift sprint.
 - Added touch HUD STOMP button and keyboard P shortcut.
 - Expanded headless combat checks for grab counter rules, stomp conditions, dodge cooldown, and sprint speed.
+
+
+## M3 — Ashen Warlord first boss encounter
+- Replaced the generic Ashigaru opponent in the main encounter with the Ashen Warlord boss controller.
+- Added a dedicated 420 vitality / 260 posture pool and a two-phase state machine. Phase II begins at 55% vitality, increases movement/attack range, and accelerates attack cadence.
+- Phase I uses a slash/thrust/heavy pattern; Phase II changes to sweep/grab/thrust/heavy to force different defensive answers.
+- Added a procedural armored silhouette with shoulder plates, chest armor, and crest, plus boss name/phase HUD feedback.
+- Added boss phase transition signal, combat feedback, and dedicated headless test coverage.
+- The boss remains built from primitive geometry and procedural poses; no skeletal boss animations, cinematic deathblow, or Android playtest yet.
