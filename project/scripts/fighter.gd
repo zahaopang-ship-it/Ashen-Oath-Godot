@@ -3,6 +3,7 @@ extends CharacterBody3D
 const NAVIGATION_STEERING = preload("res://scripts/ai/sentinel_navigation_steering.gd")
 const STEALTH_AWARENESS = preload("res://scripts/ai/stealth_awareness_controller.gd")
 const SENTINEL_AI = preload("res://scripts/ai/sentinel_ai_controller.gd")
+const TRAVERSAL_CONTROLLER = preload("res://scripts/traversal/fighter_traversal_controller.gd")
 signal telegraph_started(kind: String)
 signal attack_phase_changed(phase: String)
 signal attack_hit(target: Node)
@@ -997,6 +998,5 @@ func use_prosthetic(tool: String) -> bool:
 			succeeded = _use_axe()
 			if succeeded:
 				prosthetic_cooldown = 0.72
-		"umbrella":
 
 [executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]
