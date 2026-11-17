@@ -5,7 +5,7 @@ signal attack_hit(target: Node)
 signal posture_broken
 signal died
 
-enum CombatState { FREE, WINDUP, ACTIVE, RECOVERY, POSTURE_BROKEN, DEAD }
+enum CombatState { FREE, WINDUP, ACTIVE, RECOVERY, POSTURE_BROKEN, DEAD, HITSTUN }
 
 @export var is_player := false
 @export var display_name := "Fighter"
@@ -32,6 +32,10 @@ var deflect_timer := 0.0
 var deflect_cooldown := 0.0
 var dodge_timer := 0.0
 var posture_break_timer := 0.0
+var hit_reaction_timer := 0.0
+var hit_reaction_duration := 0.18
+var hit_flash_timer := 0.0
+var _body_material: StandardMaterial3D
 var ai_timer := 0.8
 var gravity := 22.0
 var attack_kind := "slash"
@@ -42,6 +46,7 @@ const WINDUP_TIME := 0.32
 const ACTIVE_TIME := 0.10
 const RECOVERY_TIME := 0.34
 const POSTURE_BREAK_TIME := 1.35
+const HIT_FLASH_COLOR := Color(1.0, 0.72, 0.58)
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
@@ -52,7 +57,9 @@ func _physics_process(delta: float) -> void:
 	dodge_timer = maxf(0.0, dodge_timer - delta)
 	is_deflecting = deflect_timer > 0.0
 	is_dodging = dodge_timer > 0.0
-	if state == CombatState.POSTURE_BROKEN:
+	if state == CombatState.HITSTUN:
+		_update_hit_reaction(delta)
+	elif state == CombatState.POSTURE_BROKEN:
 		posture_break_timer = maxf(0.0, posture_break_timer - delta)
 		if posture_break_timer <= 0.0:
 			state = CombatState.FREE
@@ -85,6 +92,35 @@ func _update_attack_state(delta: float) -> void:
 	elif state == CombatState.RECOVERY and attack_timer <= 0.0:
 		state = CombatState.FREE
 		attack_phase_changed.emit("finished")
+
+func _update_hit_reaction(delta: float) -> void:
+	hit_reaction_timer = maxf(0.0, hit_reaction_timer - delta)
+	hit_flash_timer = maxf(0.0, hit_flash_timer - delta)
+	if _body_material:
+		_body_material.albedo_color = HIT_FLASH_COLOR.lerp(_body_material.get_meta("base_color", Color.WHITE), 1.0 - clampf(hit_flash_timer / 0.12, 0.0, 1.0))
+	if hit_reaction_timer <= 0.0:
+		state = CombatState.FREE
+		if _body_material and _body_material.has_meta("base_color"):
+			_body_material.albedo_color = _body_material.get_meta("base_color")
+
+func set_body_material(material: StandardMaterial3D) -> void:
+	_body_material = material
+	if _body_material:
+		_body_material.set_meta("base_color", _body_material.albedo_color)
+
+func _begin_hit_reaction(attacker: Node3D) -> void:
+	if state == CombatState.POSTURE_BROKEN or is_dead:
+		return
+	state = CombatState.HITSTUN
+	hit_reaction_timer = hit_reaction_duration
+	hit_flash_timer = 0.12
+	if is_instance_valid(attacker):
+		var away := global_position - attacker.global_position
+		away.y = 0.0
+		if away.length_squared() > 0.001:
+			away = away.normalized()
+			velocity.x = away.x * 3.4
+			velocity.z = away.z * 3.4
 
 func _player_update(delta: float) -> void:
 	if state != CombatState.FREE:
@@ -172,6 +208,8 @@ func receive_strike(damage: float, posture_damage: float, attacker: Node3D) -> S
 	_check_posture_break()
 	if vitality <= 0.0:
 		_die()
+	else:
+		_begin_hit_reaction(attacker)
 	return "hit"
 
 func receive_deflect(amount: float) -> void:
@@ -186,6 +224,7 @@ func _check_posture_break() -> void:
 		state = CombatState.POSTURE_BROKEN
 		attack_phase_changed.emit("interrupted")
 		posture_break_timer = POSTURE_BREAK_TIME
+		hit_reaction_timer = 0.0
 		is_blocking = false
 		deflect_timer = 0.0
 		is_deflecting = false

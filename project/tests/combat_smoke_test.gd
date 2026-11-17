@@ -65,12 +65,20 @@ func _run() -> void:
 	_check(doomed.is_dead and doomed.state == 5, "lethal strike enters terminal dead state")
 	_check(not doomed.begin_deflect(), "dead fighter cannot deflect")
 
+	var stunned := _new_fighter("Stunned", Vector3.ZERO)
+	var source := _new_fighter("Source", Vector3(0, 0, -1))
+	_check(stunned.receive_strike(10.0, 8.0, source) == "hit", "unblocked strike returns hit result")
+	_check(stunned.state == 6 and stunned.hit_reaction_timer > 0.0, "unblocked hit enters timed hitstun")
+	_check(stunned.velocity.length() > 0.0, "hit reaction applies directional recoil")
+	stunned.call("_update_hit_reaction", 0.25)
+	_check(stunned.state == 0, "hitstun recovers to neutral after its timer")
+
 	var dodger := _new_fighter("Dodger", Vector3.ZERO)
 	dodger.dodge()
 	_check(dodger.is_dodging, "dodge grants an active evasion window")
 	_check(dodger.receive_strike(20.0, 20.0, attacker) == "evaded", "dodge window evades incoming strike")
 
-	print("Combat tests: ", 21 - failures.size(), "/21 passed")
+	print("Combat tests: ", 25 - failures.size(), "/25 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:

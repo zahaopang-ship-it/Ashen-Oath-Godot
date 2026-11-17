@@ -85,8 +85,10 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.16, 0.24, 0.31) if player_controlled else Color(0.48, 0.16, 0.12)
 	mat.roughness = 0.82
+	mesh.name = "BodyMesh"
 	mesh.material_override = mat
 	body.add_child(mesh)
+	body.set_body_material(mat)
 	var head := MeshInstance3D.new()
 	var head_mesh := SphereMesh.new()
 	head_mesh.radius = 0.25
