@@ -235,3 +235,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added combat assertions for both timed reactions and integration checks for the generated clash effect.
 - Headless validation: combat 78/78, boss 22/22, feedback integration 5/5, main-scene smoke passed, editor import passed, and `git diff --check` passed.
 - Limitation: clash FX is a procedural primitive flash, not a particle system or authored VFX; visual timing and placement still need in-engine and Android device review.
+
+## M3 — Attack-specific hit reactions and posture-break stagger
+- Replaced the single generic hitstun pose with distinct slash, thrust, sweep, heavy/Ashen Rend, and grab reaction profiles.
+- Reaction duration, knockback strength, torso lean, arm bracing, weapon recoil, and low sweep stagger now vary by incoming attack; lateral reaction direction is derived from attacker position.
+- Posture break now has a time-driven buckling/weapon-drop idle instead of a mostly static held pose.
+- Added regression coverage for thrust/heavy/sweep/grab reaction selection and timing.
+- Headless validation: combat 82/82, boss 22/22, feedback integration 5/5, main-scene smoke passed, script check/editor import passed, and `git diff --check` passed.
+- Limitation: animation remains procedural on primitive meshes; no authored skeletal clips, animation-driven weapon collision, or Android visual/device validation yet.

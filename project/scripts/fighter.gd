@@ -35,6 +35,9 @@ var dodge_timer := 0.0
 var posture_break_timer := 0.0
 var hit_reaction_timer := 0.0
 var hit_reaction_duration := 0.18
+var hit_reaction_kind := "slash"
+var _hit_reaction_side := 1.0
+var _posture_break_age := 0.0
 var hit_flash_timer := 0.0
 var _parry_pose_timer := 0.0
 var _deflect_recoil_timer := 0.0
@@ -128,6 +131,7 @@ func _physics_process(delta: float) -> void:
 	if state == CombatState.HITSTUN:
 		_update_hit_reaction(delta)
 	elif state == CombatState.POSTURE_BROKEN:
+		_posture_break_age += delta
 		posture_break_timer = maxf(0.0, posture_break_timer - delta)
 		if posture_break_timer <= 0.0:
 			state = CombatState.FREE
@@ -292,20 +296,43 @@ func _update_combat_animation(delta: float) -> void:
 		left_arm_pose = Vector3(-0.08, 0.0, 0.14)
 		right_arm_pose = Vector3(0.12, 0.0, -0.18)
 	elif state == CombatState.HITSTUN:
-		left_arm_pose = Vector3(-0.55, 0.0, 0.48)
-		right_arm_pose = Vector3(-0.42, 0.0, -0.50)
-		body_pose = Vector3(-0.42, 0.0, 0.0)
-		weapon_pose = Vector3(0.55, 0.0, 0.3)
-		body_offset = Vector3(0.0, 0.0, 0.12)
-		left_arm_pose = Vector3(-0.48, 0.0, 0.42)
-		right_arm_pose = Vector3(-0.42, 0.0, -0.38)
+		var stagger := clampf(hit_reaction_timer / maxf(0.01, hit_reaction_duration), 0.0, 1.0)
+		match hit_reaction_kind:
+			"thrust":
+				body_pose = Vector3(-0.78, 0.0, 0.10 * _hit_reaction_side) * stagger
+				left_arm_pose = Vector3(-0.22, 0.0, 0.36)
+				right_arm_pose = Vector3(-0.26, 0.0, -0.34)
+				weapon_pose = Vector3(0.62, 0.0, 0.18)
+			"heavy", "ashen_rend":
+				var force := 1.0 if hit_reaction_kind == "heavy" else 1.35
+				body_pose = Vector3(-0.92 * force, 0.0, 0.34 * _hit_reaction_side) * stagger
+				left_arm_pose = Vector3(-0.72, 0.0, 0.58)
+				right_arm_pose = Vector3(-0.68, 0.0, -0.62)
+				weapon_pose = Vector3(0.92 * force, 0.0, 0.28)
+				body_offset = Vector3(0.0, -0.12 * force, 0.08)
+			"sweep":
+				body_pose = Vector3(0.28, 0.0, 0.72 * _hit_reaction_side) * stagger
+				left_arm_pose = Vector3(0.32, 0.0, 0.62)
+				right_arm_pose = Vector3(0.26, 0.0, -0.62)
+				weapon_pose = Vector3(0.45, 0.0, 0.42)
+				body_offset = Vector3(0.0, -0.22, 0.0)
+			"grab":
+				body_pose = Vector3(-0.68, 0.0, 0.0)
+				left_arm_pose = Vector3(-0.12, 0.0, 0.78)
+				right_arm_pose = Vector3(-0.12, 0.0, -0.78)
+				weapon_pose = Vector3(0.38, 0.0, 0.0)
+			_:
+				body_pose = Vector3(-0.42, 0.0, 0.20 * _hit_reaction_side) * stagger
+				left_arm_pose = Vector3(-0.48, 0.0, 0.42)
+				right_arm_pose = Vector3(-0.42, 0.0, -0.38)
+				weapon_pose = Vector3(0.55, 0.0, 0.3)
 	elif state == CombatState.POSTURE_BROKEN:
-		left_arm_pose = Vector3(0.42, 0.0, 0.58)
-		right_arm_pose = Vector3(0.35, 0.0, -0.52)
-		body_pose = Vector3(0.62 + sin(_combat_anim_time * 13.0) * 0.06, 0.0, 0.0)
-		weapon_pose = Vector3(0.85, 0.0, 0.0)
-		left_arm_pose = Vector3(0.38, 0.0, 0.48)
-		right_arm_pose = Vector3(0.32, 0.0, -0.42)
+		var buckle := sin(_posture_break_age * 9.0)
+		left_arm_pose = Vector3(0.42 + buckle * 0.08, 0.0, 0.58)
+		right_arm_pose = Vector3(0.35 + buckle * 0.06, 0.0, -0.52)
+		body_pose = Vector3(0.72 + absf(buckle) * 0.10, 0.0, sin(_posture_break_age * 4.5) * 0.12)
+		weapon_pose = Vector3(0.95 + buckle * 0.12, 0.0, 0.08)
+		body_offset = Vector3(0.0, -0.10 - absf(buckle) * 0.04, 0.0)
 	elif state == CombatState.EXECUTING:
 		var execution_progress := 1.0 - clampf(execution_timer / 0.82, 0.0, 1.0)
 		if deathblow_executed:
@@ -392,19 +419,25 @@ func _update_combat_animation(delta: float) -> void:
 	if is_instance_valid(_right_elbow_pivot):
 		_right_elbow_pivot.rotation.x = lerpf(_right_elbow_pivot.rotation.x, right_elbow_bend, weight)
 
-func _begin_hit_reaction(attacker: Node3D) -> void:
+func _begin_hit_reaction(attacker: Node3D, incoming_kind: String = "slash") -> void:
 	if state == CombatState.POSTURE_BROKEN or is_dead:
 		return
+	hit_reaction_kind = incoming_kind
+	hit_reaction_duration = 0.34 if incoming_kind in ["heavy", "ashen_rend"] else (0.25 if incoming_kind in ["thrust", "sweep", "grab"] else 0.18)
 	state = CombatState.HITSTUN
 	hit_reaction_timer = hit_reaction_duration
-	hit_flash_timer = 0.12
+	hit_flash_timer = 0.12 if incoming_kind in ["slash", "thrust"] else 0.18
 	if is_instance_valid(attacker):
 		var away := global_position - attacker.global_position
 		away.y = 0.0
 		if away.length_squared() > 0.001:
 			away = away.normalized()
-			velocity.x = away.x * 3.4
-			velocity.z = away.z * 3.4
+			_hit_reaction_side = signf(global_transform.basis.x.dot(away))
+			if is_zero_approx(_hit_reaction_side):
+				_hit_reaction_side = 1.0
+			var knockback := 5.0 if incoming_kind in ["heavy", "ashen_rend"] else (2.2 if incoming_kind == "thrust" else 3.4)
+			velocity.x = away.x * knockback
+			velocity.z = away.z * knockback
 
 func _player_update(delta: float) -> void:
 	if state != CombatState.FREE:
@@ -528,7 +561,7 @@ func receive_strike(damage: float, posture_damage: float, attacker: Node3D, inco
 	if vitality <= 0.0:
 		_die()
 	else:
-		_begin_hit_reaction(attacker)
+		_begin_hit_reaction(attacker, incoming_kind)
 		if incoming_kind == "grab":
 			hit_reaction_timer = 0.62
 			combat_feedback.emit("grabbed", self)
@@ -547,6 +580,7 @@ func _check_posture_break() -> void:
 	posture = clampf(posture, 0.0, max_posture)
 	if posture >= max_posture and state != CombatState.POSTURE_BROKEN:
 		state = CombatState.POSTURE_BROKEN
+		_posture_break_age = 0.0
 		attack_phase_changed.emit("interrupted")
 		posture_break_timer = POSTURE_BREAK_TIME
 		posture_stomped = false

@@ -94,6 +94,19 @@ func _run() -> void:
 	stunned.call("_update_hit_reaction", 0.25)
 	_check(stunned.state == 0, "hitstun recovers to neutral after its timer")
 
+	var thrust_reaction := _new_fighter("ThrustReaction", Vector3.ZERO)
+	thrust_reaction.receive_strike(8.0, 4.0, source, "thrust")
+	_check(thrust_reaction.hit_reaction_kind == "thrust" and is_equal_approx(thrust_reaction.hit_reaction_duration, 0.25), "thrust produces a compact, longer stagger profile")
+	var heavy_reaction := _new_fighter("HeavyReaction", Vector3.ZERO)
+	heavy_reaction.receive_strike(12.0, 8.0, source, "heavy")
+	_check(heavy_reaction.hit_reaction_kind == "heavy" and heavy_reaction.hit_reaction_duration > thrust_reaction.hit_reaction_duration, "heavy hit produces a stronger, longer stagger")
+	var sweep_reaction := _new_fighter("SweepReaction", Vector3.ZERO)
+	sweep_reaction.receive_strike(8.0, 4.0, source, "sweep")
+	_check(sweep_reaction.hit_reaction_kind == "sweep" and sweep_reaction.velocity.length() > 0.0, "sweep hit records its own low-impact reaction")
+	var grab_reaction := _new_fighter("GrabReaction", Vector3.ZERO)
+	grab_reaction.receive_strike(8.0, 4.0, source, "grab")
+	_check(grab_reaction.hit_reaction_kind == "grab" and is_equal_approx(grab_reaction.hit_reaction_duration, 0.25), "grab reaction has a distinct stagger duration")
+
 	var countering := _new_fighter("Countering", Vector3.ZERO)
 	var thrust_source := _new_fighter("ThrustSource", Vector3(0, 0, -1))
 	_check(countering.begin_mikiri_counter(), "Mikiri counter opens from neutral")
@@ -134,6 +147,8 @@ func _run() -> void:
 	_check(weapon.rotation.x < -0.05, "guard state drives a defensive weapon pose")
 	animated.is_blocking = false
 	animated.state = 6
+	animated.hit_reaction_timer = 0.18
+	animated.hit_reaction_duration = 0.18
 	animated.call("_update_combat_animation", 0.05)
 	_check(upper.rotation.x < -0.05, "hitstun state drives a hit reaction pose")
 	animated._die()
@@ -266,7 +281,7 @@ func _run() -> void:
 	sprinter.call("_player_update", 0.016)
 	_check(sprinter.is_sprinting and sprinter.velocity.length() > sprinter.move_speed * 0.6 * 1.2, "keyboard sprint request works below full joystick deflection")
 
-	print("Combat tests: ", 78 - failures.size(), "/78 passed")
+	print("Combat tests: ", 82 - failures.size(), "/82 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:
