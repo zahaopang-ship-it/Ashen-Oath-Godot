@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="FighterConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/config/fighter_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+profile_id = &"ashen_warlord"
+max_vitality = 420.0
+max_posture = 260.0
+move_speed = 4.4
+attack_range = 2.5
+boss_phase_two_threshold = 0.55
+boss_phase_two_damage_scale = 1.18
+boss_phase_one_speed = 4.4
+boss_phase_two_speed = 5.25
+boss_phase_one_attack_range = 2.5
+boss_phase_two_attack_range = 2.8
+
+[executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]

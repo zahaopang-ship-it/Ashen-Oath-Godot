@@ -207,4 +207,195 @@ static func aerial_grapple_attack(actor: CharacterBody3D) -> bool:
 	actor.start_attack("heavy")
 	return true
 
+
+static func cancel_cover_transfer(actor: CharacterBody3D) -> void:
+	actor.is_cover_transferring = false
+	actor._cover_transfer_target = null
+	actor._cover_transfer_detouring = false
+	actor._cover_transfer_detour = Vector3.ZERO
+
+
+static func begin_cover_transfer(actor: CharacterBody3D, max_distance: float = 7.0) -> bool:
+	if not actor.is_player or actor.is_dead or actor.state != 0 or actor.is_vaulting or actor.is_wall_hugging or actor.is_cover_transferring or not actor.is_crouching:
+		return false
+	var nearest: Area3D
+	var nearest_distance := max_distance
+	for candidate in actor.get_tree().get_nodes_in_group("stealth_cover_zones"):
+		if not is_instance_valid(candidate) or not candidate is Area3D:
+			continue
+		var offset: Vector3 = candidate.global_position - actor.global_position
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance < 1.8 or distance >= nearest_distance:
+			continue
+		nearest = candidate
+		nearest_distance = distance
+	if not is_instance_valid(nearest):
+		return false
+	actor._cover_transfer_target = nearest
+	actor._cover_transfer_detouring = false
+	actor._cover_transfer_detour = Vector3.ZERO
+	actor.is_cover_transferring = true
+	actor.sprint_requested = false
+	actor.is_sprinting = false
+	return true
+
+
+static func toggle_wall_hug(actor: CharacterBody3D) -> bool:
+	if not actor.is_player or actor.is_dead or actor.is_vaulting or actor.state != 0:
+		return false
+	if actor.is_wall_hugging:
+		actor.is_wall_hugging = false
+		actor._wall_hug_normal = Vector3.ZERO
+		return true
+	var forward: Vector3 = -actor.global_transform.basis.z
+	var origin: Vector3 = actor.global_position + Vector3.UP * 1.0
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + forward * 0.95)
+	query.exclude = [actor.get_rid()]
+	var hit: Dictionary = actor.get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return false
+	var normal: Vector3 = hit.normal
+	if absf(normal.y) > 0.25:
+		return false
+	actor._wall_hug_normal = normal.normalized()
+	actor._wall_hug_side = signf(actor.global_transform.basis.x.dot(actor._wall_hug_normal))
+	if is_zero_approx(actor._wall_hug_side):
+		actor._wall_hug_side = 1.0
+	actor.is_wall_hugging = true
+	actor.is_crouching = true
+	actor.is_sprinting = false
+	return true
+
+
+static func try_wall_corner_transition(actor: CharacterBody3D, tangent_direction: Vector3) -> bool:
+	if tangent_direction.length_squared() < 0.5:
+		return false
+	var direction := tangent_direction.normalized()
+	var probe_origin: Vector3 = actor.global_position + direction * 0.82 + Vector3.UP * 1.0
+	var query := PhysicsRayQueryParameters3D.create(probe_origin, probe_origin - direction * 1.25)
+	query.exclude = [actor.get_rid()]
+	var hit: Dictionary = actor.get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return false
+	var next_normal: Vector3 = hit.normal
+	next_normal.y = 0.0
+	if next_normal.length_squared() < 0.5:
+		return false
+	next_normal = next_normal.normalized()
+	if absf(next_normal.dot(actor._wall_hug_normal)) > 0.78:
+		return false
+	actor._wall_hug_normal = next_normal
+	return true
+
+
+static func try_mantle(actor: CharacterBody3D) -> bool:
+	if not actor.is_player or actor.is_dead or actor.is_vaulting or actor.state != 0 or not actor.is_on_floor():
+		return false
+	var forward: Vector3 = -actor.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	if forward.length_squared() < 0.5:
+		return false
+	var space := actor.get_world_3d().direct_space_state
+	var chest_query := PhysicsRayQueryParameters3D.create(actor.global_position + Vector3.UP * 1.02, actor.global_position + Vector3.UP * 1.02 + forward * 1.05)
+	chest_query.exclude = [actor.get_rid()]
+	if space.intersect_ray(chest_query).is_empty():
+		return false
+	var head_query := PhysicsRayQueryParameters3D.create(actor.global_position + Vector3.UP * 1.92, actor.global_position + Vector3.UP * 1.92 + forward * 1.20)
+	head_query.exclude = [actor.get_rid()]
+	if not space.intersect_ray(head_query).is_empty():
+		return false
+	var landing: Vector3 = actor.global_position + forward * 1.75
+	var floor_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.8, landing + Vector3.DOWN * 2.8)
+	floor_query.exclude = [actor.get_rid()]
+	var floor_hit: Dictionary = space.intersect_ray(floor_query)
+	if floor_hit.is_empty():
+		return false
+	var landing_y: float = (floor_hit.position as Vector3).y
+	var rise := landing_y - actor.global_position.y
+	if rise < 0.45 or rise > 1.55:
+		return false
+	landing.y = landing_y
+	actor._vault_start = actor.global_position
+	actor._vault_end = landing
+	actor._vault_elapsed = 0.0
+	actor._vault_duration = 0.62
+	actor._vault_height = 0.38
+	actor._traversal_kind = "mantle"
+	actor.is_wall_hugging = false
+	actor.is_vaulting = true
+	actor.is_crouching = false
+	actor.is_sprinting = false
+	actor.sprint_requested = false
+	actor.velocity = Vector3.ZERO
+	return true
+
+
+static func try_vault(actor: CharacterBody3D) -> bool:
+	if not actor.is_player or actor.is_dead or actor.is_vaulting or actor.state != 0 or not actor.is_on_floor():
+		return false
+	var forward: Vector3 = -actor.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	if forward.length_squared() < 0.5:
+		return false
+	var space := actor.get_world_3d().direct_space_state
+	var low_query := PhysicsRayQueryParameters3D.create(actor.global_position + Vector3.UP * 0.58, actor.global_position + Vector3.UP * 0.58 + forward * 1.25)
+	low_query.exclude = [actor.get_rid()]
+	if space.intersect_ray(low_query).is_empty():
+		return false
+	var high_query := PhysicsRayQueryParameters3D.create(actor.global_position + Vector3.UP * 1.48, actor.global_position + Vector3.UP * 1.48 + forward * 1.15)
+	high_query.exclude = [actor.get_rid()]
+	if not space.intersect_ray(high_query).is_empty():
+		return false
+	var landing: Vector3 = actor.global_position + forward * 1.9
+	var floor_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.0, landing + Vector3.DOWN * 2.0)
+	floor_query.exclude = [actor.get_rid()]
+	var floor_hit: Dictionary = space.intersect_ray(floor_query)
+	if floor_hit.is_empty():
+		return false
+	landing.y = (floor_hit.position as Vector3).y
+	actor._vault_start = actor.global_position
+	actor._vault_end = landing
+	actor._vault_elapsed = 0.0
+	actor._vault_duration = 0.42
+	actor._vault_height = 0.82
+	actor._traversal_kind = "vault"
+	actor.is_wall_hugging = false
+	actor.is_vaulting = true
+	actor.is_crouching = false
+	actor.is_sprinting = false
+	actor.sprint_requested = false
+	actor.velocity = Vector3.ZERO
+	return true
+
+
+static func update_vault(actor: CharacterBody3D, delta: float) -> void:
+	actor._vault_elapsed = minf(actor._vault_duration, actor._vault_elapsed + delta)
+	var t: float = actor._vault_elapsed / actor._vault_duration
+	var eased := t * t * (3.0 - 2.0 * t)
+	actor.global_position = actor._vault_start.lerp(actor._vault_end, eased) + Vector3.UP * (sin(t * PI) * actor._vault_height)
+	if t >= 1.0:
+		actor.global_position = actor._vault_end
+		actor.is_vaulting = false
+		actor._traversal_kind = "vault"
+		actor.velocity = Vector3.ZERO
+
+
+static func set_crouching(actor: CharacterBody3D, enabled: bool) -> void:
+	if not actor.is_player or actor.is_dead or actor.state != 0:
+		return
+	if not enabled and actor.is_cover_transferring:
+		cancel_cover_transfer(actor)
+	actor.is_crouching = enabled
+	if is_instance_valid(actor.body_collision) and actor.body_collision.shape is CapsuleShape3D:
+		var capsule := actor.body_collision.shape as CapsuleShape3D
+		capsule.height = 1.05 if enabled else 1.8
+		capsule.radius = 0.36 if enabled else 0.42
+		actor.body_collision.position.y = 0.53 if enabled else 0.9
+	if enabled:
+		actor.sprint_requested = false
+		actor.is_sprinting = false
+
 [executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]

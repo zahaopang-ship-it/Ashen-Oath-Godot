@@ -342,7 +342,7 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Firecracker creates a short-lived emissive burst, interrupts nearby free guards, and redirects their investigation route to the burst location rather than the player's current position.
 - Axe applies a close-range heavy impact with strong posture pressure and a dedicated procedural swing pose. Umbrella creates a 1.25-second timed guard window, including a broader defensive pose, then closes automatically.
 - Added spirit-energy HUD bar and regression tests for targeting, damage, distraction, guard interruption, timed defense, energy costs, and invalid tool use.
-- Limitation: these are prototype gameplay implementations and primitive VFX, not final Sekiro-grade authored animations, models, or sound design. Umbrella currently uses the existing guard/block damage rules; lightning reversal and prosthetic upgrades are not implemented. Android touch/performance validation remains pending.
+- Limitation: these are prototype gameplay implementations and primitive VFX, not final Sekiro-grade authored animations, models, or sound design. Umbrella currently uses the existing guard/block damage rules. Lightning reversal and prosthetic upgrades were added in subsequent milestones below. Android touch/performance validation remains pending.
 
 
 ## M15 — Lightning reversal and prosthetic upgrades
@@ -437,10 +437,17 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Extracted shuriken, firecracker, axe, umbrella resource/cooldown handling, lightning reversal/arc feedback, and prosthetic upgrade selection into scripts/prosthetics/fighter_prosthetic_controller.gd. Existing Fighter public actions remain compatibility wrappers.
 - Extracted rest-shrine interaction/checkpoint restoration, secret-cache collection/rewards, and resurrection into scripts/exploration/fighter_exploration_controller.gd. Moved stealth-cover overlap bookkeeping into the stealth awareness controller.
 - Extracted strike reception, block/deflect/mikiri/sweep outcomes, hit-reaction/knockback setup, posture-break transitions, and death transitions into scripts/combat/fighter_combat_resolution.gd.
-- Extracted player movement, crouch/sprint acceleration, cover-transfer steering, wall-hug motion, and facing into scripts/movement/fighter_locomotion_controller.gd.
-- Extracted player acceleration/braking, crouch/sprint movement, wall-hug and cover-transfer movement, movement direction, and facing into scripts/movement/fighter_locomotion_controller.gd. Fighter retains compatibility entry points.
 - Corrected static controller references to use the actor transform and added explicit types where Godot could not infer values from the generic CharacterBody3D API.
-- Validation after the locomotion extraction is being rerun across all 17 headless suites; the combat suite now passes 104/104 after the typing fixes. Godot 4.7.2 editor import succeeds.
-- Remaining M23 work: extract procedural combat/locomotion animation, reduce fighter.gd further, introduce data-driven fighter/encounter configuration, and formalize shared event/service boundaries. fighter.gd is currently 1,210 lines. Android export/device validation remains pending.
+- Validation after architecture extraction: all 18 headless suites pass (372 assertions total); Godot 4.7.2 editor import and main-scene smoke pass; git diff --check passes.
+- Added FighterConfig Resource profiles for the player, sentinel, and Ashen Warlord; factory construction now applies profile values and the boss reads its phase tuning from its profile.
+- Extracted procedural rig binding, gait, attack/guard/hit/death poses, crouch/wall-hug/vault posing, and animation blending into `scripts/animation/fighter_animation_controller.gd`.
+- Extracted attack startup, local-space hitbox checks, one-hit resolution, and buffered player combo selection into `scripts/combat/fighter_attack_controller.gd`.
+- Extracted defensive actions/counters/dodge and synchronized stealth/posture-break deathblow plus stomp execution into `scripts/combat/fighter_action_controller.gd`.
+- Extended the traversal controller to own crouch collision resizing, cover transfer, wall-hug acquisition/corner transitions, vaulting, and mantling; Fighter now keeps thin public compatibility delegates.
+- Added `FighterConfig` profiles for player, sentinel, and Ashen Warlord. Boss phase threshold, patterns, speed, attack range, and phase-two damage scale are read from the boss resource.
+- Added `EncounterConfig` and `resources/encounters/ashen_vale.tres` for player/boss/sentinel spawns, patrol routes and speeds, cover, grapple anchors, pond/climb geometry, landmarks, cache, and shrines.
+- Extracted hitstop, impact-camera requests, deflect clash VFX, and spatial combat audio into `scripts/services/combat_feedback_service.gd`; main retains thin compatibility callbacks for the integration harness.
+- Current structure: `fighter.gd` is approximately 573 lines and `main.gd` approximately 219 lines. They remain orchestration façades; feature-specific behavior is delegated to focused controllers/services/resources.
+- Android export and device validation remain intentionally pending. No APK was generated; this refactor proceeds without export authorization.
 
 [executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]

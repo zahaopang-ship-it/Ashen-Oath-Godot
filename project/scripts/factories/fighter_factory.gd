@@ -2,6 +2,9 @@ extends RefCounted
 
 const FIGHTER_SCRIPT = preload("res://scripts/fighter.gd")
 const BOSS_SCRIPT = preload("res://scripts/boss.gd")
+const PLAYER_CONFIG = preload("res://resources/fighters/player.tres")
+const SENTINEL_CONFIG = preload("res://resources/fighters/sentinel.tres")
+const BOSS_CONFIG = preload("res://resources/fighters/ashen_warlord.tres")
 
 ## Builds a complete prototype fighter hierarchy and attaches it to `parent`.
 ## Gameplay behavior remains in Fighter/Boss; this class owns visual/physics assembly.
@@ -12,6 +15,8 @@ static func create(parent: Node, label: String, pos: Vector3, player_controlled:
 	body.set_script(BOSS_SCRIPT if boss_character else FIGHTER_SCRIPT)
 	body.is_player = player_controlled
 	body.display_name = label
+	body.fighter_config = BOSS_CONFIG if boss_character else (PLAYER_CONFIG if player_controlled else SENTINEL_CONFIG)
+	body.fighter_config.apply_to(body)
 	parent.add_child(body)
 	var collision := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
@@ -202,3 +207,6 @@ static func _add_boss_armor(body: CharacterBody3D, upper_body: Node3D) -> void:
 	crest.rotation.z = -0.18
 	crest.material_override = trim
 	upper_body.add_child(crest)
+
+
+[executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]

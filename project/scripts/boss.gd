@@ -4,27 +4,43 @@ signal boss_phase_changed(phase: int)
 
 const PHASE_ONE := 1
 const PHASE_TWO := 2
-const PHASE_TWO_THRESHOLD := 0.55
-const PHASE_ONE_PATTERN := ["slash", "thrust", "heavy", "slash"]
-const PHASE_TWO_PATTERN := ["sweep", "grab", "thrust", "lightning", "ashen_rend"]
 
 var boss_phase := PHASE_ONE
 var pattern_index := 0
 var phase_two_damage_scale := 1.18
+var phase_two_threshold := 0.55
+var phase_one_pattern: Array[String] = ["slash", "thrust", "heavy", "slash"]
+var phase_two_pattern: Array[String] = ["sweep", "grab", "thrust", "lightning", "ashen_rend"]
+var phase_one_speed := 4.4
+var phase_two_speed := 5.25
+var phase_one_attack_range := 2.5
+var phase_two_attack_range := 2.8
 var phase_transition_count := 0
 
 func _ready() -> void:
 	display_name = "Ashen Warlord"
-	max_vitality = 420.0
-	vitality = max_vitality
-	max_posture = 260.0
-	posture = 0.0
-	move_speed = 4.4
-	attack_range = 2.5
+	if fighter_config is FighterConfig:
+		var config := fighter_config as FighterConfig
+		phase_two_threshold = config.boss_phase_two_threshold
+		phase_two_damage_scale = config.boss_phase_two_damage_scale
+		phase_one_pattern = config.boss_phase_one_pattern.duplicate()
+		phase_two_pattern = config.boss_phase_two_pattern.duplicate()
+		phase_one_speed = config.boss_phase_one_speed
+		phase_two_speed = config.boss_phase_two_speed
+		phase_one_attack_range = config.boss_phase_one_attack_range
+		phase_two_attack_range = config.boss_phase_two_attack_range
+	else:
+		# Preserve the boss archetype defaults when instantiated directly in tests or tools.
+		max_vitality = 420.0
+		vitality = max_vitality
+		max_posture = 260.0
+		posture = 0.0
+		move_speed = phase_one_speed
+		attack_range = phase_one_attack_range
 	ai_timer = 1.1
 
 func _physics_process(delta: float) -> void:
-	if not is_dead and boss_phase == PHASE_ONE and vitality <= max_vitality * PHASE_TWO_THRESHOLD:
+	if not is_dead and boss_phase == PHASE_ONE and vitality <= max_vitality * phase_two_threshold:
 		_enter_phase_two()
 	super._physics_process(delta)
 
@@ -35,8 +51,8 @@ func _enter_phase_two() -> void:
 	phase_transition_count += 1
 	pattern_index = 0
 	ai_timer = 0.35
-	move_speed = 5.25
-	attack_range = 2.8
+	move_speed = phase_two_speed
+	attack_range = phase_two_attack_range
 	boss_phase_changed.emit(boss_phase)
 	combat_feedback.emit("boss_phase", self)
 
@@ -58,7 +74,7 @@ func _ai_update(delta: float) -> void:
 	ai_timer -= delta
 	if ai_timer > 0.0 or distance > attack_range:
 		return
-	var pattern: Array = PHASE_ONE_PATTERN if boss_phase == PHASE_ONE else PHASE_TWO_PATTERN
+	var pattern: Array = phase_one_pattern if boss_phase == PHASE_ONE else phase_two_pattern
 	var chosen: String = pattern[pattern_index % pattern.size()]
 	pattern_index += 1
 	var started := start_attack(chosen)
@@ -81,4 +97,6 @@ func _resolve_attack_hit() -> void:
 	attack_hit.emit(target)
 
 func get_phase_pattern() -> Array:
-	return PHASE_ONE_PATTERN.duplicate() if boss_phase == PHASE_ONE else PHASE_TWO_PATTERN.duplicate()
+	return phase_one_pattern.duplicate() if boss_phase == PHASE_ONE else phase_two_pattern.duplicate()
+
+[executed on device: 7c002306e9ff (fe647cfc-f15d-4336-86f3-23818a8e869a)]
