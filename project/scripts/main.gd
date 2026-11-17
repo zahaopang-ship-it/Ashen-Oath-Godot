@@ -5,6 +5,7 @@ const HUD_SCRIPT = preload("res://scripts/touch_hud.gd")
 var player: CharacterBody3D
 var enemy: CharacterBody3D
 var boss: CharacterBody3D
+var guard: CharacterBody3D
 var camera: Camera3D
 var arena_radius := 13.0
 var camera_yaw := 0.0
@@ -35,7 +36,14 @@ const AUDIO_EVENTS := {
 func _ready() -> void:
 	_setup_world()
 	player = _make_fighter("Wolf", Vector3(0, 0, 4), true)
-	boss = _make_fighter("AshenWarlord", Vector3(0, 0, -3), false)
+	boss = _make_fighter("AshenWarlord", Vector3(0, 0, -3), false, true)
+	guard = _make_fighter("AshenSentinel", Vector3(-7.0, 0.0, -1.0), false)
+	guard.add_to_group("stealth_guards")
+	guard.target = player
+	guard.patrol_points.assign([Vector3(-7.0, 0.0, -1.0), Vector3(-7.0, 0.0, -7.0), Vector3(-10.0, 0.0, -7.0), Vector3(-10.0, 0.0, -1.0)])
+	guard.patrol_speed = 1.55
+	guard.vision_range = 12.0
+	guard.vision_half_angle_degrees = 52.0
 	enemy = boss
 	player.target = enemy
 	enemy.target = player
@@ -87,11 +95,11 @@ func _setup_world() -> void:
 		for z in [-9.0, 9.0]:
 			_make_tree(Vector3(x, 0, z))
 
-func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> CharacterBody3D:
+func _make_fighter(label: String, pos: Vector3, player_controlled: bool, boss_character: bool = false) -> CharacterBody3D:
 	var body := CharacterBody3D.new()
 	body.name = label
 	body.position = pos
-	body.set_script(FIGHTER_SCRIPT if player_controlled else BOSS_SCRIPT)
+	body.set_script(BOSS_SCRIPT if boss_character else FIGHTER_SCRIPT)
 	body.is_player = player_controlled
 	body.display_name = label
 	add_child(body)
@@ -102,6 +110,7 @@ func _make_fighter(label: String, pos: Vector3, player_controlled: bool) -> Char
 	collision.shape = capsule
 	collision.position.y = 0.9
 	body.add_child(collision)
+	body.body_collision = collision
 	var upper_body := Node3D.new()
 	upper_body.name = "UpperBodyPivot"
 	body.add_child(upper_body)
@@ -478,6 +487,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E:
 				if not player.stealth_deathblow_target():
 					player.deathblow_broken_target()
+			KEY_C: player.toggle_crouch()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:

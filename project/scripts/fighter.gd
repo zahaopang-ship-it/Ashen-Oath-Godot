@@ -69,6 +69,13 @@ var vision_range := 10.0
 var vision_half_angle_degrees := 48.0
 var sprint_noise_range := 8.0
 var stealth_deathblow_started := false
+var is_crouching := false
+var body_collision: CollisionShape3D
+var patrol_points: Array[Vector3] = []
+var patrol_index := 0
+var patrol_wait_timer := 0.0
+var patrol_speed := 1.65
+var _patrol_pause := 0.7
 var gravity := 22.0
 var attack_kind := "slash"
 var is_mikiri_countering := false
@@ -406,6 +413,13 @@ func _update_combat_animation(delta: float) -> void:
 			body_pose.z += 0.025
 			left_arm_pose.z += 0.08
 			right_arm_pose.z -= 0.06
+	if is_crouching:
+		left_leg_pose = maxf(left_leg_pose, 0.62)
+		right_leg_pose = maxf(right_leg_pose, 0.62)
+		body_pose.x += 0.12
+		body_offset.y -= 0.16
+		left_arm_pose.x -= 0.08
+		right_arm_pose.x -= 0.08
 	var parry_blend := clampf(_parry_pose_timer / 0.22, 0.0, 1.0)
 	var recoil_blend := clampf(_deflect_recoil_timer / 0.20, 0.0, 1.0)
 	# A successful deflect snaps the defender's blade into the contact line.
@@ -460,12 +474,17 @@ func _player_update(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, movement_braking * delta)
 		return
 	var move_dir := _get_player_move_direction()
-	is_sprinting = sprint_requested or input_move.length() >= 0.82
-	var current_speed := move_speed * (1.42 if is_sprinting else 1.0)
+	is_sprinting = not is_crouching and (sprint_requested or input_move.length() >= 0.82)
+	var current_speed := move_speed * (0.48 if is_crouching else (1.42 if is_sprinting else 1.0))
 	var desired_velocity := move_dir * current_speed
 	var accel := movement_acceleration if move_dir.length_squared() > 0.001 else movement_braking
 	velocity.x = move_toward(velocity.x, desired_velocity.x, accel * delta)
 	velocity.z = move_toward(velocity.z, desired_velocity.z, accel * delta)
+	if is_instance_valid(_upper_body):
+		_upper_body.position.y = lerpf(_upper_body.position.y, -0.28 if is_crouching else 0.0, 1.0 - exp(-12.0 * delta))
+	if is_crouching:
+		velocity.x *= 0.92
+		velocity.z *= 0.92
 	if is_instance_valid(target) and not target.is_dead:
 		var to_target := target.global_position - global_position
 		to_target.y = 0.0
@@ -484,9 +503,13 @@ func _get_player_move_direction() -> Vector3:
 
 
 func _ai_update(delta: float) -> void:
-	if not is_instance_valid(target) or target.is_dead or state != CombatState.FREE:
+	if state != CombatState.FREE:
 		return
-	_update_awareness(delta)
+	if is_instance_valid(target) and not target.is_dead:
+		_update_awareness(delta)
+	else:
+		_patrol_update(delta)
+		return
 	var to_target := target.global_position - global_position
 	to_target.y = 0.0
 	var distance := to_target.length()
@@ -527,8 +550,45 @@ func _ai_update(delta: float) -> void:
 				awareness_state = AwarenessState.IDLE
 				suspicion = 0.0
 	elif awareness_state == AwarenessState.IDLE:
+		_patrol_update(delta)
+
+func _patrol_update(delta: float) -> void:
+	if patrol_points.is_empty():
 		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
 		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
+		return
+	if patrol_wait_timer > 0.0:
+		patrol_wait_timer = maxf(0.0, patrol_wait_timer - delta)
+		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
+		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
+		return
+	var waypoint := patrol_points[patrol_index % patrol_points.size()]
+	var direction := waypoint - global_position
+	direction.y = 0.0
+	if direction.length() <= 0.45:
+		patrol_index = (patrol_index + 1) % patrol_points.size()
+		patrol_wait_timer = _patrol_pause
+		return
+	direction = direction.normalized()
+	velocity.x = direction.x * patrol_speed
+	velocity.z = direction.z * patrol_speed
+	_face_direction(direction, delta, 4.0)
+
+func set_crouching(enabled: bool) -> void:
+	if not is_player or is_dead or state != CombatState.FREE:
+		return
+	is_crouching = enabled
+	if is_instance_valid(body_collision) and body_collision.shape is CapsuleShape3D:
+		var capsule := body_collision.shape as CapsuleShape3D
+		capsule.height = 1.05 if enabled else 1.8
+		capsule.radius = 0.36 if enabled else 0.42
+		body_collision.position.y = 0.53 if enabled else 0.9
+	if enabled:
+		sprint_requested = false
+		is_sprinting = false
+
+func toggle_crouch() -> void:
+	set_crouching(not is_crouching)
 
 func _update_awareness(delta: float) -> void:
 	if not is_instance_valid(target) or target.is_dead:
@@ -536,15 +596,17 @@ func _update_awareness(delta: float) -> void:
 	var offset := target.global_position - global_position
 	offset.y = 0.0
 	var distance := offset.length()
-	var visible := distance <= vision_range and _target_in_vision_cone(offset) and _has_clear_line_of_sight(target)
-	var noisy: bool = bool(target.get("is_sprinting")) and distance <= sprint_noise_range
+	var crouched: bool = bool(target.get("is_crouching"))
+	var effective_vision := vision_range * (0.52 if crouched else 1.0)
+	var visible := distance <= effective_vision and _target_in_vision_cone(offset) and _has_clear_line_of_sight(target)
+	var noisy: bool = (bool(target.get("is_sprinting")) or (bool(target.get("is_crouching")) == false and Vector2(target.velocity.x, target.velocity.z).length() > 3.2)) and distance <= sprint_noise_range
 	if visible:
 		last_known_target_position = target.global_position
 		lost_sight_timer = 0.0
 		if awareness_state == AwarenessState.IDLE or awareness_state == AwarenessState.SEARCHING:
 			awareness_state = AwarenessState.SUSPICIOUS
 		if awareness_state == AwarenessState.SUSPICIOUS:
-			suspicion += delta * (1.8 if distance < 4.0 else 1.0)
+			suspicion += delta * (0.48 if crouched else (1.8 if distance < 4.0 else 1.0))
 			if suspicion >= suspicion_threshold:
 				awareness_state = AwarenessState.ALERTED
 				ai_timer = 0.25
@@ -562,11 +624,6 @@ func _update_awareness(delta: float) -> void:
 			if lost_sight_timer >= 4.0:
 				awareness_state = AwarenessState.SEARCHING
 				search_timer = 2.6
-		elif awareness_state == AwarenessState.SEARCHING:
-			search_timer -= delta
-			if search_timer <= 0.0:
-				awareness_state = AwarenessState.IDLE
-				suspicion = 0.0
 
 func _target_in_vision_cone(offset: Vector3) -> bool:
 	if offset.length_squared() < 0.001:
@@ -582,7 +639,8 @@ func _has_clear_line_of_sight(candidate: Node3D) -> bool:
 	var world := get_world_3d()
 	if world == null:
 		return true
-	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.35, candidate.global_position + Vector3.UP * 1.0)
+	var target_height := 0.55 if bool(candidate.get("is_crouching")) else 1.0
+	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.35, candidate.global_position + Vector3.UP * target_height)
 	query.exclude = [get_rid()]
 	var hit := world.direct_space_state.intersect_ray(query)
 	return hit.is_empty() or hit.get("collider") == candidate
@@ -605,8 +663,11 @@ func _face_direction(dir: Vector3, delta: float, turn_speed: float = 12.0) -> vo
 func start_attack(kind: String = "slash") -> bool:
 	if is_dead or state != CombatState.FREE or is_blocking or not ATTACK_KINDS.has(kind):
 		return false
-	if is_player and is_instance_valid(target) and target.has_method("emit_noise"):
-		target.emit_noise(global_position, 9.5)
+	if is_player:
+		var noise_radius := 3.2 if is_crouching else 9.5
+		for listener in get_tree().get_nodes_in_group("stealth_guards"):
+			if is_instance_valid(listener) and listener.has_method("emit_noise"):
+				listener.emit_noise(global_position, noise_radius)
 	_attack_token += 1
 	_attack_hit_applied = false
 	attack_kind = kind

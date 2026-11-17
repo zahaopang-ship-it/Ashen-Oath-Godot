@@ -11,6 +11,7 @@ var vitality_bar: ProgressBar
 var posture_bar: ProgressBar
 var enemy_vitality: ProgressBar
 var enemy_posture: ProgressBar
+var suspicion_bar: ProgressBar
 var status_label: Label
 var action_rects: Dictionary = {}
 
@@ -32,6 +33,8 @@ func _build_ui() -> void:
 	posture_bar = _make_bar(root, Vector2(28, 78), Vector2(250, 12), Color(0.83, 0.61, 0.18))
 	enemy_vitality = _make_bar(root, Vector2(500, 36), Vector2(280, 14), Color(0.62, 0.12, 0.10))
 	enemy_posture = _make_bar(root, Vector2(500, 55), Vector2(280, 9), Color(0.83, 0.61, 0.18))
+	suspicion_bar = _make_bar(root, Vector2(28, 101), Vector2(250, 8), Color(0.88, 0.48, 0.12))
+	suspicion_bar.max_value = 1.15
 	var enemy_label := Label.new()
 	enemy_label.text = "ASHEN WARLORD  /  BOSS"
 	enemy_label.position = Vector2(500, 10)
@@ -67,8 +70,9 @@ func _build_ui() -> void:
 	_register_action("JUMP", Vector2(-195, -70), "jump", Color(0.18, 0.42, 0.55))
 	_register_action("STOMP", Vector2(-370, -145), "stomp", Color(0.52, 0.30, 0.12))
 	_register_action("DEATHBLOW", Vector2(-370, -70), "deathblow", Color(0.72, 0.08, 0.08))
+	_register_action("CROUCH", Vector2(-370, -250), "crouch", Color(0.25, 0.34, 0.39))
 	var hint := Label.new()
-	hint.text = "Approach from behind for stealth deathblow  /  Sprint and attacks make noise"
+	hint.text = "C crouch  /  Move quietly  /  Approach guards from behind for stealth deathblow"
 	hint.position = Vector2(28, 132)
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
@@ -162,6 +166,7 @@ func _action_down(action: String) -> void:
 		"deathblow":
 			if not game.player.stealth_deathblow_target():
 				game.player.deathblow_broken_target()
+		"crouch": game.player.toggle_crouch()
 
 func _action_up(action: String) -> void:
 	match action:
@@ -187,8 +192,9 @@ func _process(_delta: float) -> void:
 	var movement_label := "SPRINT" if game.player.is_sprinting else "WALK"
 	var execution_prompt := "  /  DEATHBLOW READY" if game.enemy.state == 4 and not game.enemy.is_dead else ""
 	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
-	var awareness_text: String = ["UNAWARE", "SUSPICIOUS", "SEARCHING", "ALERTED"][game.enemy.awareness_state]
-	status_label.text = "PLAYER: " + _state_name(game.player) + " / " + movement_label + "   |   WARLORD: " + awareness_text + " / " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
+	var awareness_text: String = ["UNAWARE", "SUSPICIOUS", "SEARCHING", "ALERTED"][game.guard.awareness_state]
+	suspicion_bar.value = game.guard.suspicion
+	status_label.text = "PLAYER: " + _state_name(game.player) + (" / CROUCH" if game.player.is_crouching else " / " + movement_label) + "   |   SENTINEL: " + awareness_text + "   |   WARLORD: " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
 
 func _state_name(fighter: Node) -> String:
 	if fighter.state == 4: return "POSTURE BROKEN"

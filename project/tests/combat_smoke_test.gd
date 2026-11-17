@@ -215,6 +215,38 @@ func _run() -> void:
 	alerted_guard.awareness_state = FIGHTER.AwarenessState.ALERTED
 	_check(not exposed_player.stealth_deathblow_target(), "stealth deathblow is rejected after the guard is alerted")
 
+	var crouch_player := _new_fighter("CrouchPlayer", Vector3.ZERO)
+	crouch_player.is_player = true
+	var crouch_shape := CollisionShape3D.new()
+	crouch_shape.shape = CapsuleShape3D.new()
+	crouch_shape.shape.height = 1.8
+	crouch_shape.position.y = 0.9
+	crouch_player.add_child(crouch_shape)
+	crouch_player.body_collision = crouch_shape
+	crouch_player.set_crouching(true)
+	_check(crouch_player.is_crouching and is_equal_approx((crouch_shape.shape as CapsuleShape3D).height, 1.05), "crouch lowers the collision capsule")
+	crouch_player.sprint_requested = true
+	crouch_player.call("_player_update", 0.1)
+	_check(not crouch_player.is_sprinting and Vector2(crouch_player.velocity.x, crouch_player.velocity.z).length() < crouch_player.move_speed, "crouch disables sprint and slows movement")
+	crouch_player.set_crouching(false)
+	_check(not crouch_player.is_crouching and is_equal_approx((crouch_shape.shape as CapsuleShape3D).height, 1.8), "standing restores the normal collision capsule")
+	var crouch_guard := _new_fighter("CrouchGuard", Vector3.ZERO)
+	var crouched_intruder := _new_fighter("CrouchedIntruder", Vector3(0.0, 0.0, -7.0))
+	crouch_guard.target = crouched_intruder
+	crouched_intruder.is_crouching = true
+	crouch_guard.call("_update_awareness", 0.5)
+	_check(crouch_guard.awareness_state == FIGHTER.AwarenessState.IDLE, "crouching reduces detection range enough to remain unseen at distance")
+	var noise_player := _new_fighter("NoisePlayer", Vector3.ZERO)
+	var noise_guard := _new_fighter("NoiseGuard", Vector3(0.0, 0.0, 2.0))
+	noise_player.is_player = true
+	noise_guard.add_to_group("stealth_guards")
+	noise_player.start_attack()
+	_check(noise_guard.awareness_state == FIGHTER.AwarenessState.SUSPICIOUS, "player attacks broadcast noise to nearby stealth guards")
+	var patrol_guard := _new_fighter("PatrolGuard", Vector3.ZERO)
+	patrol_guard.patrol_points.assign([Vector3(0.0, 0.0, -3.0), Vector3(3.0, 0.0, -3.0)])
+	patrol_guard.call("_patrol_update", 0.1)
+	_check(patrol_guard.velocity.z < 0.0, "unalerted guard moves toward its patrol waypoint")
+
 	var gait_fighter := _new_fighter("GaitFighter", Vector3.ZERO)
 	gait_fighter.is_player = true
 	var gait_upper := Node3D.new()
@@ -341,7 +373,7 @@ func _run() -> void:
 	sprinter.call("_player_update", 0.016)
 	_check(sprinter.is_sprinting and sprinter.velocity.length() > 0.0, "keyboard sprint request works below full joystick deflection")
 
-	print("Combat tests: ", 94 - failures.size(), "/94 passed")
+	print("Combat tests: ", 100 - failures.size(), "/100 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:

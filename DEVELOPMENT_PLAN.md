@@ -1,200 +1,273 @@
-extends CanvasLayer
-var game: Node
-var stick_touch := -1
-var look_touch := -1
-var action_touches: Dictionary = {}
-var move_vector := Vector2.ZERO
-var stick_radius := 78.0
-var stick_knob: ColorRect
-var stick_control: Control
-var vitality_bar: ProgressBar
-var posture_bar: ProgressBar
-var enemy_vitality: ProgressBar
-var enemy_posture: ProgressBar
-var status_label: Label
-var action_rects: Dictionary = {}
+# Ashen Oath — Technical Design & Milestone Plan
 
-func _ready() -> void:
-	_build_ui()
+## Product direction
+A mobile-first 3D action game with precise sword combat inspired by the feel and combat vocabulary of Sekiro. Original title, characters, world, assets, animation, sound, and code. Do not copy proprietary Sekiro assets or branding.
 
-func _build_ui() -> void:
-	var root := Control.new()
-	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(root)
-	var title := Label.new()
-	title.text = "ASHEN OATH  /  COMBAT TEST"
-	title.position = Vector2(28, 18)
-	title.add_theme_font_size_override("font_size", 18)
-	title.add_theme_color_override("font_color", Color(0.85, 0.83, 0.75))
-	root.add_child(title)
-	vitality_bar = _make_bar(root, Vector2(28, 54), Vector2(250, 18), Color(0.65, 0.13, 0.12))
-	posture_bar = _make_bar(root, Vector2(28, 78), Vector2(250, 12), Color(0.83, 0.61, 0.18))
-	enemy_vitality = _make_bar(root, Vector2(500, 36), Vector2(280, 14), Color(0.62, 0.12, 0.10))
-	enemy_posture = _make_bar(root, Vector2(500, 55), Vector2(280, 9), Color(0.83, 0.61, 0.18))
-	var enemy_label := Label.new()
-	enemy_label.text = "ASHEN WARLORD  /  BOSS"
-	enemy_label.position = Vector2(500, 10)
-	enemy_label.add_theme_font_size_override("font_size", 15)
-	root.add_child(enemy_label)
-	status_label = Label.new()
-	status_label.position = Vector2(28, 105)
-	status_label.add_theme_font_size_override("font_size", 14)
-	status_label.add_theme_color_override("font_color", Color(0.95, 0.82, 0.48))
-	root.add_child(status_label)
-	stick_control = Control.new()
-	stick_control.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	stick_control.position = Vector2(70, -220)
-	stick_control.size = Vector2(156, 156)
-	stick_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(stick_control)
-	var ring := ColorRect.new()
-	ring.color = Color(0.85, 0.85, 0.85, 0.12)
-	ring.size = Vector2(150, 150)
-	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stick_control.add_child(ring)
-	stick_knob = ColorRect.new()
-	stick_knob.color = Color(0.9, 0.88, 0.78, 0.42)
-	stick_knob.size = Vector2(58, 58)
-	stick_knob.position = Vector2(46, 46)
-	stick_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stick_control.add_child(stick_knob)
-	_register_action("ATTACK", Vector2(-195, -145), "attack", Color(0.62, 0.16, 0.12))
-	_register_action("DEFLECT", Vector2(-115, -250), "deflect", Color(0.72, 0.55, 0.20))
-	_register_action("BLOCK", Vector2(-275, -250), "block", Color(0.25, 0.37, 0.48))
-	_register_action("DODGE", Vector2(-95, -70), "dodge", Color(0.25, 0.42, 0.32))
-	_register_action("MIKIRI", Vector2(-275, -70), "mikiri", Color(0.58, 0.25, 0.12))
-	_register_action("JUMP", Vector2(-195, -70), "jump", Color(0.18, 0.42, 0.55))
-	_register_action("STOMP", Vector2(-370, -145), "stomp", Color(0.52, 0.30, 0.12))
-	_register_action("DEATHBLOW", Vector2(-370, -70), "deathblow", Color(0.72, 0.08, 0.08))
-	var hint := Label.new()
-	hint.text = "Approach from behind for stealth deathblow  /  Sprint and attacks make noise"
-	hint.position = Vector2(28, 132)
-	hint.add_theme_font_size_override("font_size", 12)
-	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
-	root.add_child(hint)
+## Non-negotiable production rules
+- Godot version is pinned to 4.7.2 stable.
+- Android touch controls are a first-class requirement, not an afterthought.
+- Virtual joystick and action controls must support simultaneous multi-touch.
+- Camera drag must not cancel movement or action input.
+- Keep combat logic data-driven where practical and separate input, combat state, animation, AI, and UI.
+- Every stable milestone is committed to Git. Never rely on a temporary remote desktop session as the only copy.
+- Do not mark a feature done until scripts parse, scenes load, runtime logs are clean, and the feature is exercised.
+- Keep all exported APK/AAB files in a dedicated builds directory, separate from project source and older projects.
 
-func _make_bar(parent: Control, pos: Vector2, bar_size: Vector2, color: Color) -> ProgressBar:
-	var bar := ProgressBar.new()
-	bar.position = pos
-	bar.size = bar_size
-	bar.min_value = 0
-	bar.max_value = 100
-	bar.value = 100
-	bar.show_percentage = false
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = color
-	bar.add_theme_stylebox_override("fill", fill)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.04, 0.04, 0.05, 0.78)
-	bar.add_theme_stylebox_override("background", bg)
-	parent.add_child(bar)
-	return bar
+## Combat model
+### Vitality and posture
+- Vitality is health; posture is the guard-break pressure meter.
+- Posture rises from blocked attacks, failed defense, and pressure.
+- Posture recovery depends on combat state and vitality; lower vitality should slow recovery.
+- Posture break should create a punish/deathblow opportunity rather than silently resetting with no feedback.
 
-func _register_action(label_text: String, offset: Vector2, action: String, color: Color) -> void:
-	var b := Button.new()
-	b.text = label_text
-	b.size = Vector2(100, 70)
-	b.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	b.position = offset
-	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_theme_font_size_override("font_size", 14)
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.bg_color.a = 0.72
-	style.corner_radius_top_left = 18
-	style.corner_radius_top_right = 18
-	style.corner_radius_bottom_left = 18
-	style.corner_radius_bottom_right = 18
-	b.add_theme_stylebox_override("normal", style)
-	b.add_theme_stylebox_override("pressed", style)
-	get_child(0).add_child(b)
-	action_rects[action] = Rect2(Vector2(get_viewport().get_visible_rect().size.x, get_viewport().get_visible_rect().size.y) + offset, b.size)
+### Deflection and block
+- Deflect has a precise 12-frame target window at 60 FPS (about 200 ms).
+- A successful deflect negates vitality damage and applies posture damage to the attacker.
+- A normal block reduces vitality damage but adds posture to the defender.
+- Repeatedly holding or spamming deflect must not provide permanent perfect defense.
+- Deflect timing, cooldown, recovery, and input buffering must be explicit states.
 
-func _input(event: InputEvent) -> void:
-	if not is_instance_valid(game) or not is_instance_valid(game.player):
-		return
-	var size := get_viewport().get_visible_rect().size
-	if event is InputEventScreenTouch:
-		if event.pressed:
-			var action := _action_at(event.position)
-			if action != "":
-				action_touches[event.index] = action
-				_action_down(action)
-				get_viewport().set_input_as_handled()
-			elif event.position.x < size.x * 0.42 and stick_touch == -1:
-				stick_touch = event.index
-				_update_stick(event.position)
-			elif event.position.x >= size.x * 0.42 and look_touch == -1:
-				look_touch = event.index
-		else:
-			if action_touches.has(event.index):
-				_action_up(str(action_touches[event.index]))
-				action_touches.erase(event.index)
-			if event.index == stick_touch:
-				stick_touch = -1
-				move_vector = Vector2.ZERO
-				game.player.input_move = move_vector
-				stick_knob.position = Vector2(46, 46)
-			if event.index == look_touch:
-				look_touch = -1
-	elif event is InputEventScreenDrag:
-		if event.index == stick_touch:
-			_update_stick(event.position)
-		elif event.index == look_touch:
-			game.rotate_camera(event.relative.x, event.relative.y)
+### Player actions
+- Locomotion, sprint, jump, dodge, crouch/stealth, lock-on, attack chain, block, deflect.
+- Input buffer for attacks and defense with clear priority rules.
+- Mikiri counter for thrust attacks.
+- Jump/stomp response to sweep attacks.
+- Dodge/grab interactions and punish windows.
+- Deathblow against posture-broken or unaware enemies.
+- Aerial and stealth deathblows.
 
-func _action_at(pos: Vector2) -> String:
-	for action in action_rects:
-		if action_rects[action].has_point(pos):
-			return str(action)
-	return ""
+### Enemy and boss AI
+- Awareness states: unaware, suspicious, searching, alert, combat, recovering, dead.
+- Enemy telegraphs must be readable on a phone screen.
+- Bosses use phase/state machines with distinct attack patterns and recovery windows.
+- Thrust, sweep, grab, and ordinary attack classes must be distinguishable for counter logic.
 
-func _action_down(action: String) -> void:
-	match action:
-		"attack": game.player.player_attack()
-		"deflect": game.player.begin_deflect()
-		"block": game.player.begin_block()
-		"dodge": game.player.dodge()
-		"mikiri": game.player.begin_mikiri_counter()
-		"jump": game.player.begin_sweep_evade()
-		"stomp": game.player.stomp_broken_target()
-		"deathblow":
-			if not game.player.stealth_deathblow_target():
-				game.player.deathblow_broken_target()
+### Advanced systems
+- Resurrection with explicit charge/lockout rules.
+- Prosthetic tools: Shuriken, Firecrackers, Axe, Umbrella.
+- Lightning reversal interaction.
+- Grappling hook with validated grapple points and mobile-friendly targeting.
+- Hitstop, camera impulse, animation response, spatial audio, and clear hit confirmation.
 
-func _action_up(action: String) -> void:
-	match action:
-		"deflect": game.player.end_deflect()
-		"block": game.player.end_block()
+## Architecture target
+- Input layer: desktop debug input plus touch HUD; both feed the same action interface.
+- Player controller: locomotion and movement modes only.
+- Combat controller: attack/defense state machine, windows, input buffer, and hit resolution.
+- Vitality/posture component: health, posture, break, recovery, death.
+- Enemy AI: awareness and combat decision state machines.
+- Animation driver: maps gameplay states to animation parameters; gameplay must not depend on placeholder mesh layout.
+- Camera rig: follow, lock-on framing, collision, camera drag, hit response.
+- UI: mobile-safe HUD, vitality/posture bars, telegraph indicators, tool selection, pause.
+- Audio: event-driven spatial SFX and mix priorities.
 
-func _update_stick(screen_pos: Vector2) -> void:
-	var center := Vector2(70.0 + 78.0, get_viewport().get_visible_rect().size.y - 142.0)
-	var delta := screen_pos - center
-	if delta.length() > stick_radius:
-		delta = delta.normalized() * stick_radius
-	move_vector = delta / stick_radius
-	game.player.input_move = move_vector
-	stick_knob.position = Vector2(46, 46) + delta * 0.58
+## Milestones and acceptance gates
+### M0 — Project foundation (current)
+- Godot 4.7.2 installed and pinned.
+- New project and main scene.
+- Procedural test arena, player/enemy bodies, camera, initial touch HUD.
+- Initial vitality/posture, deflect/block/dodge and simple enemy behavior.
+- Gate: headless import and scene smoke test pass; fix every parser/runtime error before M1.
 
-func _process(_delta: float) -> void:
-	if not is_instance_valid(game) or not is_instance_valid(game.player) or not is_instance_valid(game.enemy):
-		return
-	vitality_bar.value = game.player.get_vitality_ratio() * 100.0
-	posture_bar.value = game.player.get_posture_ratio() * 100.0
-	enemy_vitality.value = game.enemy.get_vitality_ratio() * 100.0
-	enemy_posture.value = game.enemy.get_posture_ratio() * 100.0
-	var movement_label := "SPRINT" if game.player.is_sprinting else "WALK"
-	var execution_prompt := "  /  DEATHBLOW READY" if game.enemy.state == 4 and not game.enemy.is_dead else ""
-	var phase_text := "PHASE II" if game.enemy.boss_phase == 2 else "PHASE I"
-	var awareness_text := ["UNAWARE", "SUSPICIOUS", "SEARCHING", "ALERTED"][game.enemy.awareness_state]
-	status_label.text = "PLAYER: " + _state_name(game.player) + " / " + movement_label + "   |   WARLORD: " + awareness_text + " / " + phase_text + " / " + _state_name(game.enemy) + execution_prompt
+### M1 — Combat vertical slice (in progress)
+- [x] Combat state flow: windup, active, recovery, posture-broken, dead.
+- [x] Single-hit attack resolution with range/facing validation and readable windup state.
+- [x] Deflect window (200 ms), post-deflect lockout, held-guard fallback, and posture pressure.
+- [x] Posture threshold enters a timed broken state; vitality-dependent posture recovery.
+- [x] Independent touch pointer tracking for movement, camera, and action-button fingers; keyboard debug controls (WASD/J/K/L/Space).
+- [x] Headless combat logic suite: 67 assertions passing (including attack hit-volume, combo-buffer, grab/stomp, dodge cooldown, and sprint checks).
+- [x] Feedback integration suite: 3/3 checks (hitstop activation/restoration and spatial sound node creation).
+- [ ] Validate simultaneous touch on a physical Android device; headless tests cannot prove touch-driver behavior.
+- [x] Add a visible pulsing enemy windup marker and light camera impact feedback on confirmed hits.
+- [x] Add short directional hitstun/recoil and a temporary material flash for unblocked hits.
+- [ ] Add spatial telegraph audio, hit reactions, and broader automated movement/input tests.
+- Gate: test matrix for all input combinations and combat outcomes; do not close M1 until physical multitouch is exercised.
 
-func _state_name(fighter: Node) -> String:
-	if fighter.state == 4: return "POSTURE BROKEN"
-	if fighter.state == 1: return "TELEGRAPH"
-	if fighter.state == 2: return "ATTACK"
-	if fighter.state == 3: return "RECOVERY"
-	if fighter.is_blocking: return "GUARD"
-	if fighter.is_deflecting: return "DEFLECT"
-	return "READY"
+### M2 — Combat depth
+- [x] Attack classes and counter windows: slash, thrust/Mikiri, sweep/jump, and heavy.
+- [x] Procedural combat pose foundation: attack anticipation/follow-through, guard, hitstun, posture break, and death.
+- [x] Three-step slash/slash/heavy combo with a 0.58-second buffered input window.
+- [x] Attack-specific forward hit volumes evaluated during active frames (narrow thrust, wide sweep, standard slash, heavy).
+- [x] Stomp punish against a nearby posture-broken target.
+- [x] Grab attack bypasses guard/deflect but is evaded by dodge; enemy AI can select it.
+- [x] Dodge cooldown prevents repeated invulnerability-window spam.
+- [x] Sprint movement activates at full joystick deflection; keyboard Shift is supported.
+- [x] Short hitstop on hit, deflect, Mikiri/sweep counter, posture break, and death.
+- [x] Stronger decaying camera shake and impact nudge tuned by combat event.
+- [x] Original generated spatial SFX for body impact, sword deflect, guard clang, and posture break.
+- Enemy archetypes and combat state machine.
+- Gate: no stuck states; each attack type has a valid counter and punish path.
+
+### M3 — Boss and signature mechanics
+- [x] First boss encounter: Ashen Warlord with two distinct phases, escalating tempo, and phase-specific attack sequences.
+- [x] Boss-specific vitality/posture pools, phase HUD label, and procedural armor silhouette.
+- [x] Headless boss phase transition and pattern tests.
+- [x] Contextual deathblow against a nearby posture-broken boss; validates range, facing, posture state, and one-time execution.
+- [x] Phase II signature Ashen Rend: extended telegraph, unique crimson warning, broad heavy hit volume, and distinct procedural anticipation/follow-through.
+- [x] Phase transition feedback: intensified crimson telegraph, hitstop, camera impulse, and spatial cue.
+- [ ] Authored skeletal boss animation set.
+- Deathblow, stealth/aerial deathblow.
+- Resurrection rules.
+- Shuriken, Firecrackers, Axe, Umbrella, lightning reversal, grappling.
+- Gate: full encounter can be completed with touch controls.
+
+### M4 — Content and production quality
+- Replace blockout fighters/environment with properly licensed assets.
+- Retarget and tune animation library; bespoke combat transitions.
+- Spatial audio, ambience, UI feedback, VFX, camera polish.
+- Gate: asset licenses recorded; no missing resources.
+
+### M5 — Android validation
+- Import/export templates pinned to Godot 4.7.2.
+- Android ARM64 export profile and permissions.
+- Test on actual Android device, including thermal/performance behavior.
+- Verify multitouch, orientation, safe areas, pause/resume, audio focus, and save behavior.
+- Keep APK/AAB in builds/ with versioned filenames and test notes.
+
+## Current known limitations
+- Fighters are still procedural primitive rigs with simple procedural locomotion and the arena is a greybox; no production character/environment assets, foot IK, or authored skeletal animation clips have been integrated.
+- Combat is still a prototype: hit volumes are deterministic local-space gameplay boxes rather than weapon-bone swept collision; combat SFX are synthesized placeholders; Android export and device validation remain outstanding.
+- The Linux container has no graphical desktop or physical touchscreen; Android rendering, safe areas, and true simultaneous multitouch remain unverified.
+- GitHub repository: https://github.com/zahaopang-ship-it/Ashen-Oath-Godot (private), branch `main`. Push every stable checkpoint here; never use an unrelated repository.
+
+
+## M1 combat expansion — attack classes and counters
+- Added four validated attack classes: slash, thrust, sweep, and heavy, each with distinct windup, vitality damage, and posture pressure.
+- Enemy AI now selects from the attack classes instead of using slash exclusively.
+- Telegraph orb color identifies the incoming attack class (slash red, thrust amber, sweep cyan, heavy violet).
+- Added a short Mikiri counter window against thrust attacks and a 0.60-second jump-evasion window against sweep attacks; successful counters punish attacker posture.
+- Heavy attacks remain deflectable but deal substantially more posture damage through guard.
+- Added dedicated mobile HUD actions and keyboard shortcuts for Mikiri and jump.
+- Headless combat suite: 34/34 assertions passed; editor import and main-scene smoke run completed successfully.
+- Still prototype scope: no animation-driven hitboxes, production character assets, Android device test, or APK in this milestone.
+
+
+## M2 — Procedural combat pose animation foundation
+- Reparented the capsule body, head, and blade under upper-body and weapon pivots so the fighter has controllable articulation points.
+- Added attack-specific anticipation and follow-through poses for slash, thrust, sweep, and heavy attacks, driven directly by windup/active timers.
+- Added guard, dodge, Mikiri, sweep-jump, hitstun, posture-break, death, and idle pose responses.
+- Added headless assertions for heavy anticipation, active follow-through, guard pose, hit reaction, and death collapse pose.
+- This is procedural pose animation on primitive meshes, not a skeletal animation asset or a replacement for authored animation clips.
+
+
+## M2 — Timed hit volumes and buffered combo chain
+- Replaced the simple distance/facing check with attack-specific local-space hit volumes evaluated during the active attack window.
+- Slash/heavy use broad forward volumes, thrust uses a narrow and longer volume, and sweep uses a low wide volume.
+- Attack hits are resolved during active frames and remain single-hit per attack token.
+- Added a three-stage player chain (slash → slash → heavy) and a 0.58-second input buffer consumed when recovery ends.
+- Buffered inputs expire cleanly; the combo chain resets after 0.95 seconds without continuation.
+- Added headless tests for rear rejection, thrust lateral rejection, sweep lateral coverage, combo buffering, finisher, and expiry.
+- Hit volumes are currently deterministic local-space gameplay volumes, not weapon-bone swept collision or animation-authored Area3D hitboxes.
+
+
+## M2 — Hitstop, impact camera, and combat audio
+- Added event-driven combat feedback signals for hits, deflects, guards, Mikiri/sweep counters, posture breaks, and death.
+- Added brief global hitstop with unscaled SceneTree timers and generation tokens, so stale callbacks cannot prematurely restore Engine.time_scale after a newer impact.
+- Tuned event-specific hitstop durations and camera shake strengths; counter and posture-break events receive stronger emphasis.
+- Added four original synthesized WAV effects and play them through temporary AudioStreamPlayer3D nodes at the combatant position with distance attenuation.
+- Verified all four audio resources are present and combat feedback signals fire in headless tests.
+- No commercial/third-party sound assets were copied; these are procedural placeholder SFX pending final sound design.
+
+- Feedback integration test: `project/tests/feedback_integration_test.gd` verifies hitstop activation/restoration and 3D impact audio node creation in a live headless scene.
+
+
+## M2 — Grab, stomp, dodge discipline, and sprint movement
+- Added a telegraphed grab attack with its own windup, damage, and forward reach; guard and deflect do not counter grabs, while dodge still evades them.
+- Added an extended grab hit reaction and mapped grab feedback to the impact sound event.
+- Enemy AI can now select grabs occasionally, and the telegraph uses a pale warning color.
+- Added a contextual stomp action that damages a nearby posture-broken target and rejects distant or non-broken targets.
+- Added dodge cooldown to prevent immediate repeated evasion windows.
+- Full virtual-stick deflection now produces sprint speed; desktop debug input supports Shift sprint.
+- Added touch HUD STOMP button and keyboard P shortcut.
+- Expanded headless combat checks for grab counter rules, stomp conditions, dodge cooldown, and sprint speed.
+
+
+## M3 — Ashen Warlord first boss encounter
+- Replaced the generic Ashigaru opponent in the main encounter with the Ashen Warlord boss controller.
+- Added a dedicated 420 vitality / 260 posture pool and a two-phase state machine. Phase II begins at 55% vitality, increases movement/attack range, and accelerates attack cadence.
+- Phase I uses a slash/thrust/heavy pattern; Phase II changes to sweep/grab/thrust/heavy to force different defensive answers.
+- Added a procedural armored silhouette with shoulder plates, chest armor, and crest, plus boss name/phase HUD feedback.
+- Added boss phase transition signal, combat feedback, and dedicated headless test coverage.
+- The boss remains built from primitive geometry and procedural poses; no skeletal boss animations, cinematic deathblow, or Android playtest yet.
+
+
+## M3 — Deathblow and Ashen Warlord signature attack
+- Added a contextual DEATHBLOW touch action and `E` keyboard action. It only succeeds when the target is posture-broken, alive, within execution distance, and in front of the player.
+- A successful deathblow now runs a synchronized 0.82-second attacker/victim execution sequence with distinct procedural draw-back, strike, fold, and collapse poses. The victim enters the terminal death state only after the sequence completes. Repeated, distant, rear-facing, and pre-break attempts are rejected.
+- Added the Phase II-only `ashen_rend` attack to the Warlord's pattern. It has a 0.92-second telegraph, distinct broad hit volume, increased damage/posture pressure, and dedicated procedural windup/follow-through poses.
+- Added a crimson signature telegraph and stronger phase-transition impact feedback.
+- Automated checks cover execution eligibility, one-time death, range/facing validation, phase-specific move selection, and signature telegraph timing.
+- Prototype limitation: deathblow is currently a gameplay state/instant finisher, not a cinematic synchronized animation; authored skeletal animation and physical Android input validation remain outstanding.
+
+
+## M3 — Synchronized execution animation pass
+- Replaced the instant deathblow with a timed 0.82-second paired execution state. Attacker and posture-broken victim enter the sequence together and cannot move or accept normal combat actions during it.
+- Added distinct procedural execution poses: attacker draw-back/strike/follow-through and victim fold/collapse. The boss only transitions to DEAD when the sequence timer completes.
+- Added regression checks for paired state entry, movement/attack lockout, mid-animation timing, delayed terminal death, and one-shot execution behavior.
+- This remains procedural transform animation on capsule/primitive characters; it is not yet authored skeletal animation or motion-captured cinematic choreography.
+
+## M3 — Procedural locomotion and footwork pass
+- Added independent left/right leg pivots and simple leg/foot meshes to the greybox fighter rig; the upper-body capsule was shortened to create clearer separation between torso and legs.
+- Added a continuous gait phase driven by planar movement speed, with alternating leg swings, a subtle vertical body bounce, and light torso/weapon sway. Sprinting increases cadence and body response.
+- Added a lower guarded dodge posture and kept leg locomotion subordinate to combat states, so windup/active/recovery, hitstun, posture break, death, and synchronized execution continue to own the pose.
+- Boss locomotion has a heavier cadence and a more forceful Phase II stride; its idle weapon/body stance is distinct from the player.
+- Added five regression assertions for gait phase, alternating legs, body bounce, attack-state suppression, and return to idle. Headless combat suite: 72/72; boss suite: 22/22; feedback integration: 3/3.
+- Limitation: this is still procedural animation on primitive meshes, without foot IK, root-motion clips, authored skeletal animation, or Android visual validation.
+
+## M3 — Procedural upper-body, arm, and weapon articulation
+- Added separate left/right shoulder pivots with upper-arm, forearm, and hand meshes; the katana grip is now attached to the right-hand/weapon pivot rather than floating independently beside the torso.
+- Added state-driven arm poses for neutral guard, attack anticipation and follow-through, recovery, hitstun, posture break, dodge/counters, death, and the paired deathblow sequence.
+- The weapon retains its existing attack-specific rotation layered beneath the arm pivot, so the arm carries the sword while the blade still receives its combat pose.
+- Added regression checks confirming both arm pivots respond to attack anticipation and the weapon arm assumes a defensive angle during guard.
+- Headless validation: combat 74/74, boss 22/22, feedback integration 3/3, editor import and main-scene smoke passed.
+- Limitation: these are procedural primitive arm segments and transform poses, not skinned mesh deformation, hand IK, authored animation clips, or Android visual validation. Weapon collision remains the existing gameplay hit-volume system.
+
+## M3 — Independent elbow and wrist articulation
+- Rebuilt each primitive arm as a shoulder pivot, upper-arm segment, independent elbow pivot, forearm segment, and wrist pivot/hand.
+- Reparented the katana grip and blade beneath the right wrist, so the weapon now inherits shoulder and elbow motion instead of being attached directly to the shoulder.
+- Added procedural elbow flex driven by the active arm pose, with a stronger compact bend during guard; attack poses articulate both elbows.
+- Added regression checks for elbow response during attack anticipation and defensive guard.
+- Headless validation: combat 76/76, boss 22/22, feedback integration 3/3, Godot editor import and main-scene smoke passed.
+- Limitation: the rig remains a hierarchy of primitive meshes and Node3D pivots; no skinned character, inverse kinematics, retargeted animation clips, or Android visual/device validation yet.
+
+## M3 — Deflect clash and weapon-recoil feedback
+- Perfect deflect now drives a short blade-contact pose on the defender and a separate shoulder/weapon recoil on the attacker.
+- Added a brief crossed-blade spark flash at the midpoint between the fighters, layered with the existing deflect hitstop, camera shake, and spatial sword sound.
+- Added combat assertions for both timed reactions and integration checks for the generated clash effect.
+- Headless validation: combat 78/78, boss 22/22, feedback integration 5/5, main-scene smoke passed, editor import passed, and `git diff --check` passed.
+- Limitation: clash FX is a procedural primitive flash, not a particle system or authored VFX; visual timing and placement still need in-engine and Android device review.
+
+## M3 — Attack-specific hit reactions and posture-break stagger
+- Replaced the single generic hitstun pose with distinct slash, thrust, sweep, heavy/Ashen Rend, and grab reaction profiles.
+- Reaction duration, knockback strength, torso lean, arm bracing, weapon recoil, and low sweep stagger now vary by incoming attack; lateral reaction direction is derived from attacker position.
+- Posture break now has a time-driven buckling/weapon-drop idle instead of a mostly static held pose.
+- Added regression coverage for thrust/heavy/sweep/grab reaction selection and timing.
+- Headless validation: combat 82/82, boss 22/22, feedback integration 5/5, main-scene smoke passed, script check/editor import passed, and `git diff --check` passed.
+- Limitation: animation remains procedural on primitive meshes; no authored skeletal clips, animation-driven weapon collision, or Android visual/device validation yet.
+
+
+## M4 — Combat footwork, directional dodge, and adaptive camera framing
+- Added acceleration/braking-based player movement instead of immediate full-speed velocity changes.
+- While a target is assigned, the player smoothly maintains target-facing orientation during lateral and backward movement, enabling lock-on strafing without turning away.
+- Dodge now follows the current movement direction; neutral dodge retreats from the assigned target, and the player keeps facing that target during the evade.
+- Camera distance and height now respond to player–enemy spacing, with a slight sprint framing adjustment.
+- Regression coverage: lateral strafe, target-facing while strafing, lateral dodge, target-facing during dodge, and neutral retreat.
+- Headless validation: combat 87/87, boss 22/22, feedback integration 5/5, editor import, main-scene smoke, and `git diff --check` passed.
+- Limitation: touch-screen feel, camera composition, and movement responsiveness still require hands-on Android testing; no device build was produced in this phase.
+
+## M5 — Stealth awareness and rear deathblow
+- Added enemy awareness states: unaware, suspicious, searching, and alerted.
+- Enemy vision uses a forward cone, configurable range, and physics raycast line-of-sight.
+- Suspicion builds while the target remains visible and decays when it disappears; sustained sight escalates to alert and pursuit.
+- Sprinting and player attacks create investigation noise; alerted guards search the last known target position after losing sight.
+- Added a rear-approach stealth deathblow with range, facing, awareness, and state checks, using synchronized execution.
+- Headless validation: combat 94/94, boss 22/22, feedback 5/5, editor import and main-scene smoke passed.
+
+## M6 — Crouch, patrol routes, and detection feedback
+- Added crouch toggle (keyboard C and touchscreen button) with a shortened collision capsule, lowered body pose, bent legs, reduced movement speed, and sprint suppression.
+- Crouching reduces enemy effective vision range and suspicion gain; line-of-sight checks target a lower body point.
+- Player attacks broadcast noise to stealth guards; crouched attacks have a smaller hearing radius. Sprinting and fast non-crouched movement remain audible.
+- Added waypoint patrol movement for unaware guards, pause-at-waypoint behavior, and return to patrol after completing a search.
+- Added an Ashen Sentinel guard to the arena with a four-point patrol route, configurable vision, and a live suspicion meter/state in the HUD.
+- Regression coverage includes crouch collision/movement, crouch concealment, and patrol waypoint movement.
+- Headless validation: combat 100/100, boss 22/22, feedback 5/5, editor import, main-scene smoke, and git diff --check passed.
+- Limitation: the guard is a single prototype NPC; no authored animation clips, cover snapping, shadow/light visibility model, or Android device validation yet.
