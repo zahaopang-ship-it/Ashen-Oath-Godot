@@ -475,7 +475,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_I: player.begin_mikiri_counter()
 			KEY_O: player.begin_sweep_evade()
 			KEY_P: player.stomp_broken_target()
-			KEY_E: player.deathblow_broken_target()
+			KEY_E:
+				if not player.stealth_deathblow_target():
+					player.deathblow_broken_target()
 			KEY_KP_1: player.end_deflect()
 			KEY_KP_2: player.end_block()
 	if event is InputEventKey and not event.pressed:

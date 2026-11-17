@@ -7,6 +7,7 @@ signal died
 signal combat_feedback(kind: String, source: Node3D)
 
 enum CombatState { FREE, WINDUP, ACTIVE, RECOVERY, POSTURE_BROKEN, DEAD, HITSTUN, EXECUTING }
+enum AwarenessState { IDLE, SUSPICIOUS, SEARCHING, ALERTED }
 
 @export var is_player := false
 @export var display_name := "Fighter"
@@ -58,6 +59,16 @@ var _combat_anim_time := 0.0
 var _gait_phase := 0.0
 var _locomotion_bob := 0.0
 var ai_timer := 0.8
+var awareness_state: AwarenessState = AwarenessState.IDLE
+var suspicion := 0.0
+var suspicion_threshold := 1.15
+var search_timer := 0.0
+var lost_sight_timer := 0.0
+var last_known_target_position := Vector3.ZERO
+var vision_range := 10.0
+var vision_half_angle_degrees := 48.0
+var sprint_noise_range := 8.0
+var stealth_deathblow_started := false
 var gravity := 22.0
 var attack_kind := "slash"
 var is_mikiri_countering := false
@@ -475,32 +486,115 @@ func _get_player_move_direction() -> Vector3:
 func _ai_update(delta: float) -> void:
 	if not is_instance_valid(target) or target.is_dead or state != CombatState.FREE:
 		return
+	_update_awareness(delta)
 	var to_target := target.global_position - global_position
 	to_target.y = 0.0
 	var distance := to_target.length()
-	if distance > 1.7:
-		var dir := to_target.normalized()
-		velocity.x = dir.x * move_speed * 0.72
-		velocity.z = dir.z * move_speed * 0.72
-		_face_direction(dir, delta)
+	if awareness_state == AwarenessState.ALERTED:
+		if distance > 1.7:
+			var dir := to_target.normalized()
+			velocity.x = dir.x * move_speed * 0.72
+			velocity.z = dir.z * move_speed * 0.72
+			_face_direction(dir, delta)
+		else:
+			velocity.x = move_toward(velocity.x, 0.0, 22.0 * delta)
+			velocity.z = move_toward(velocity.z, 0.0, 22.0 * delta)
+		ai_timer -= delta
+		if ai_timer <= 0.0 and distance <= attack_range:
+			ai_timer = randf_range(1.15, 1.75)
+			if randf() < 0.72:
+				var roll := randf()
+				var chosen := "slash"
+				if roll < 0.18:
+					chosen = "thrust"
+				elif roll < 0.34:
+					chosen = "sweep"
+				elif roll < 0.48:
+					chosen = "heavy"
+				elif roll < 0.57:
+					chosen = "grab"
+				start_attack(chosen)
+	elif awareness_state == AwarenessState.SEARCHING:
+		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
+		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
+		var search_dir := last_known_target_position - global_position
+		search_dir.y = 0.0
+		if search_dir.length() > 0.65:
+			_face_direction(search_dir.normalized(), delta, 5.0)
+		else:
+			search_timer -= delta
+			if search_timer <= 0.0:
+				awareness_state = AwarenessState.IDLE
+				suspicion = 0.0
+	elif awareness_state == AwarenessState.IDLE:
+		velocity.x = move_toward(velocity.x, 0.0, 18.0 * delta)
+		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
+
+func _update_awareness(delta: float) -> void:
+	if not is_instance_valid(target) or target.is_dead:
+		return
+	var offset := target.global_position - global_position
+	offset.y = 0.0
+	var distance := offset.length()
+	var visible := distance <= vision_range and _target_in_vision_cone(offset) and _has_clear_line_of_sight(target)
+	var noisy: bool = bool(target.get("is_sprinting")) and distance <= sprint_noise_range
+	if visible:
+		last_known_target_position = target.global_position
+		lost_sight_timer = 0.0
+		if awareness_state == AwarenessState.IDLE or awareness_state == AwarenessState.SEARCHING:
+			awareness_state = AwarenessState.SUSPICIOUS
+		if awareness_state == AwarenessState.SUSPICIOUS:
+			suspicion += delta * (1.8 if distance < 4.0 else 1.0)
+			if suspicion >= suspicion_threshold:
+				awareness_state = AwarenessState.ALERTED
+				ai_timer = 0.25
+	elif noisy and awareness_state != AwarenessState.ALERTED:
+		last_known_target_position = target.global_position
+		awareness_state = AwarenessState.SUSPICIOUS
+		suspicion = minf(suspicion_threshold, suspicion + delta * 1.5)
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, 22.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 22.0 * delta)
-	ai_timer -= delta
-	if ai_timer <= 0.0 and distance <= attack_range:
-		ai_timer = randf_range(1.15, 1.75)
-		if randf() < 0.72:
-			var roll := randf()
-			var chosen := "slash"
-			if roll < 0.18:
-				chosen = "thrust"
-			elif roll < 0.34:
-				chosen = "sweep"
-			elif roll < 0.48:
-				chosen = "heavy"
-			elif roll < 0.57:
-				chosen = "grab"
-			start_attack(chosen)
+		if awareness_state == AwarenessState.SUSPICIOUS:
+			suspicion = maxf(0.0, suspicion - delta * 0.45)
+			if suspicion <= 0.0:
+				awareness_state = AwarenessState.IDLE
+		elif awareness_state == AwarenessState.ALERTED:
+			lost_sight_timer += delta
+			if lost_sight_timer >= 4.0:
+				awareness_state = AwarenessState.SEARCHING
+				search_timer = 2.6
+		elif awareness_state == AwarenessState.SEARCHING:
+			search_timer -= delta
+			if search_timer <= 0.0:
+				awareness_state = AwarenessState.IDLE
+				suspicion = 0.0
+
+func _target_in_vision_cone(offset: Vector3) -> bool:
+	if offset.length_squared() < 0.001:
+		return true
+	var forward := -global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() < 0.001:
+		return false
+	var threshold := cos(deg_to_rad(vision_half_angle_degrees))
+	return forward.normalized().dot(offset.normalized()) >= threshold
+
+func _has_clear_line_of_sight(candidate: Node3D) -> bool:
+	var world := get_world_3d()
+	if world == null:
+		return true
+	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.35, candidate.global_position + Vector3.UP * 1.0)
+	query.exclude = [get_rid()]
+	var hit := world.direct_space_state.intersect_ray(query)
+	return hit.is_empty() or hit.get("collider") == candidate
+
+func emit_noise(noise_position: Vector3, radius: float) -> void:
+	if is_player or is_dead or awareness_state == AwarenessState.ALERTED:
+		return
+	if global_position.distance_to(noise_position) <= radius:
+		last_known_target_position = noise_position
+		awareness_state = AwarenessState.SUSPICIOUS
+		suspicion = minf(suspicion_threshold, suspicion + 0.55)
+
 
 func _face_direction(dir: Vector3, delta: float, turn_speed: float = 12.0) -> void:
 	if dir.length_squared() < 0.001:
@@ -511,6 +605,8 @@ func _face_direction(dir: Vector3, delta: float, turn_speed: float = 12.0) -> vo
 func start_attack(kind: String = "slash") -> bool:
 	if is_dead or state != CombatState.FREE or is_blocking or not ATTACK_KINDS.has(kind):
 		return false
+	if is_player and is_instance_valid(target) and target.has_method("emit_noise"):
+		target.emit_noise(global_position, 9.5)
 	_attack_token += 1
 	_attack_hit_applied = false
 	attack_kind = kind
@@ -708,6 +804,37 @@ func stomp_broken_target() -> bool:
 	if offset.length_squared() > 0.001 and (-global_transform.basis.z).normalized().dot(offset.normalized()) < 0.0:
 		return false
 	return target.receive_stomp(self)
+
+func stealth_deathblow_target() -> bool:
+	if is_dead or state != CombatState.FREE or not is_instance_valid(target):
+		return false
+	if target.is_dead or target.state != CombatState.FREE or target.awareness_state == AwarenessState.ALERTED or target.stealth_deathblow_started:
+		return false
+	var offset := global_position - target.global_position
+	offset.y = 0.0
+	if offset.length() > 2.25 or offset.length_squared() < 0.001:
+		return false
+	var target_forward := -target.global_transform.basis.z
+	if target_forward.dot(offset.normalized()) > -0.35:
+		return false
+	return target.receive_stealth_deathblow(self)
+
+func receive_stealth_deathblow(attacker: Node3D) -> bool:
+	if is_dead or state != CombatState.FREE or awareness_state == AwarenessState.ALERTED or stealth_deathblow_started or not is_instance_valid(attacker):
+		return false
+	stealth_deathblow_started = true
+	deathblow_executed = true
+	state = CombatState.EXECUTING
+	execution_timer = 0.82
+	execution_partner = attacker
+	velocity = Vector3.ZERO
+	if attacker is CharacterBody3D:
+		attacker.state = CombatState.EXECUTING
+		attacker.execution_timer = 0.82
+		attacker.execution_partner = self
+		attacker.deathblow_executed = false
+	combat_feedback.emit("deathblow", self)
+	return true
 
 func deathblow_broken_target() -> bool:
 	if is_dead or state != CombatState.FREE or not is_instance_valid(target):

@@ -178,6 +178,43 @@ func _run() -> void:
 	backward_dodge.dodge()
 	_check(backward_dodge.velocity.z > 9.0, "neutral dodge retreats away from the locked target")
 
+	var guard := _new_fighter("StealthGuard", Vector3.ZERO)
+	var intruder := _new_fighter("Intruder", Vector3(0.0, 0.0, -5.0))
+	guard.target = intruder
+	intruder.target = guard
+	guard.call("_update_awareness", 0.5)
+	_check(guard.awareness_state == FIGHTER.AwarenessState.SUSPICIOUS, "guard notices a target entering its forward vision cone")
+	guard.call("_update_awareness", 0.8)
+	_check(guard.awareness_state == FIGHTER.AwarenessState.ALERTED, "suspicion escalates into full alert after sustained sight")
+	var rear_guard := _new_fighter("RearGuard", Vector3.ZERO)
+	var rear_intruder := _new_fighter("RearIntruder", Vector3(0.0, 0.0, 4.0))
+	rear_guard.target = rear_intruder
+	rear_guard.call("_update_awareness", 0.5)
+	_check(rear_guard.awareness_state == FIGHTER.AwarenessState.IDLE, "guard cannot see an intruder directly behind it")
+	rear_intruder.is_sprinting = true
+	rear_guard.call("_update_awareness", 0.5)
+	_check(rear_guard.awareness_state == FIGHTER.AwarenessState.SUSPICIOUS, "sprinting creates an audible investigation stimulus")
+	var search_guard := _new_fighter("SearchGuard", Vector3.ZERO)
+	var fleeing_target := _new_fighter("FleeingTarget", Vector3(0.0, 0.0, -4.0))
+	search_guard.target = fleeing_target
+	search_guard.awareness_state = FIGHTER.AwarenessState.ALERTED
+	fleeing_target.position = Vector3(0.0, 0.0, 14.0)
+	search_guard.call("_update_awareness", 4.1)
+	_check(search_guard.awareness_state == FIGHTER.AwarenessState.SEARCHING, "guard searches the last known position after losing sight")
+	var stealth_player := _new_fighter("StealthPlayer", Vector3(0.0, 0.0, 1.5))
+	var unaware_guard := _new_fighter("UnawareGuard", Vector3.ZERO)
+	stealth_player.is_player = true
+	stealth_player.target = unaware_guard
+	unaware_guard.target = stealth_player
+	_check(stealth_player.stealth_deathblow_target(), "rear approach enables a stealth deathblow")
+	_check(unaware_guard.state == FIGHTER.CombatState.EXECUTING and unaware_guard.stealth_deathblow_started, "stealth deathblow enters synchronized execution")
+	var exposed_player := _new_fighter("ExposedPlayer", Vector3(0.0, 0.0, 1.5))
+	var alerted_guard := _new_fighter("AlertedGuard", Vector3.ZERO)
+	exposed_player.target = alerted_guard
+	alerted_guard.target = exposed_player
+	alerted_guard.awareness_state = FIGHTER.AwarenessState.ALERTED
+	_check(not exposed_player.stealth_deathblow_target(), "stealth deathblow is rejected after the guard is alerted")
+
 	var gait_fighter := _new_fighter("GaitFighter", Vector3.ZERO)
 	gait_fighter.is_player = true
 	var gait_upper := Node3D.new()
@@ -304,7 +341,7 @@ func _run() -> void:
 	sprinter.call("_player_update", 0.016)
 	_check(sprinter.is_sprinting and sprinter.velocity.length() > 0.0, "keyboard sprint request works below full joystick deflection")
 
-	print("Combat tests: ", 87 - failures.size(), "/87 passed")
+	print("Combat tests: ", 94 - failures.size(), "/94 passed")
 	if not failures.is_empty():
 		quit(1)
 	else:
