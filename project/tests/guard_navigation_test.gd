@@ -44,8 +44,25 @@ func _run() -> void:
 	await process_frame
 	var restored: Vector3 = guard._get_navigation_direction(desired)
 	_check(restored.is_equal_approx(desired), "guard resumes its direct route after the obstacle is removed")
+	var nearby_guard := CharacterBody3D.new()
+	nearby_guard.position = guard.global_position + Vector3(0.8, 0.0, -0.8)
+	var nearby_shape := CollisionShape3D.new()
+	var nearby_capsule := CapsuleShape3D.new()
+	nearby_capsule.radius = 0.38
+	nearby_capsule.height = 1.7
+	nearby_shape.shape = nearby_capsule
+	nearby_guard.add_child(nearby_shape)
+	nearby_guard.add_to_group("stealth_guards")
+	game.add_child(nearby_guard)
+	guard.add_to_group("stealth_guards")
+	var separated: Vector3 = guard._apply_guard_separation(Vector3.FORWARD)
+	_check(separated.dot(Vector3.FORWARD) < 0.98, "guard separation steers away from a nearby sentinel")
+	_check(separated.length() > 0.98 and absf(separated.x) > 0.15, "crowd avoidance keeps a usable travel direction while creating lateral spacing")
+	nearby_guard.position = guard.global_position + Vector3(0.0, 0.0, -4.0)
+	var distant: Vector3 = guard._apply_guard_separation(Vector3.FORWARD)
+	_check(distant.is_equal_approx(Vector3.FORWARD), "sentinels do not influence each other outside the separation radius")
 	if failures.is_empty():
-		print("Guard navigation tests: 6/6 passed")
+		print("Guard navigation tests: 9/9 passed")
 	else:
-		printerr("Guard navigation tests: ", 6 - failures.size(), "/6 passed")
+		printerr("Guard navigation tests: ", 9 - failures.size(), "/9 passed")
 	quit(0 if failures.is_empty() else 1)

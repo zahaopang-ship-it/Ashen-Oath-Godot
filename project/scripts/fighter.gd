@@ -807,6 +807,7 @@ func _steer_ai_toward(destination: Vector3, speed: float, delta: float, turn_spe
 		velocity.z = move_toward(velocity.z, 0.0, 18.0 * delta)
 		return
 	var direction := _get_navigation_direction(desired.normalized())
+	direction = _apply_guard_separation(direction)
 	var desired_velocity := direction * speed
 	velocity.x = move_toward(velocity.x, desired_velocity.x, 10.0 * delta)
 	velocity.z = move_toward(velocity.z, desired_velocity.z, 10.0 * delta)
@@ -839,6 +840,31 @@ func _get_navigation_direction(desired_direction: Vector3, probe_distance: float
 			best_score = score
 			best_direction = candidate
 	return best_direction
+
+
+func _apply_guard_separation(travel_direction: Vector3, radius: float = 2.4) -> Vector3:
+	var result := Vector3(travel_direction.x, 0.0, travel_direction.z)
+	if result.length_squared() < 0.001 or not is_inside_tree():
+		return result.normalized() if result.length_squared() > 0.001 else Vector3.ZERO
+	var separation := Vector3.ZERO
+	var neighbors := 0
+	for node in get_tree().get_nodes_in_group("stealth_guards"):
+		if node == self or not node is CharacterBody3D:
+			continue
+		var offset: Vector3 = global_position - (node as CharacterBody3D).global_position
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance > 0.05 and distance < radius:
+			var weight := (radius - distance) / radius
+			separation += offset.normalized() * weight
+			neighbors += 1
+	if neighbors == 0 or separation.length_squared() < 0.001:
+		return result.normalized()
+	separation /= float(neighbors)
+	var combined := result.normalized() + separation * 1.35
+	if combined.length_squared() < 0.001:
+		return result.normalized()
+	return combined.normalized()
 
 func _try_wall_corner_transition(tangent_direction: Vector3) -> bool:
 	if tangent_direction.length_squared() < 0.5 or _wall_hug_normal.length_squared() < 0.5:

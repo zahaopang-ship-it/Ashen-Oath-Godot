@@ -16,13 +16,14 @@ Fresh Godot 4.7.2 project. A mobile-first 3D action game prototype with Sekiro-i
 - A hidden Grove Relic Cache rewards off-path exploration. Press X or the touchscreen SECRET action nearby to collect a one-time prosthetic upgrade point and spirit energy.
 - Added the two-step “The Grove’s Forgotten Oath” exploration objective: find the western relic cache, then carry its discovery to the Grove Rest Shrine. Completion grants two extra prosthetic upgrade points and spirit energy; the HUD tracks the objective and the reward cannot be claimed twice.
 - Sentinel patrol, investigation, and alerted pursuit now use local collision-aware steering: physics probes select angled detours around nearby solid obstacles while preserving direct travel in clear corridors. This is local avoidance, not global navmesh pathfinding.
+- Nearby sentinels now use distance-weighted local separation while patrolling or pursuing, reducing overlap without changing routes when guards are far apart.
 - Procedural wall-hug pose leans the torso toward the wall and tucks the weapon arm while preserving the crouched stance.
 - Current validation is headless on Linux; Android export and real-device touch/visual checks are still pending.
 
 ## Roadmap
 1. Replace primitive fighters with rigged characters and authored combat/traversal animation.
 2. Replace blockout landmarks and props with a coherent licensed/CC0 environment art set.
-3. Replace local ray-probe steering with robust global navigation/pathfinding, crowd avoidance, and more encounter-specific enemy behaviors.
+3. Replace local ray-probe steering with robust global navigation/pathfinding and add more encounter-specific enemy behaviors; current short-range sentinel separation is a local avoidance layer, not full crowd simulation.
 4. Expand the objective chain into a journal, more secrets, and persistent save/checkpoint data.
 5. Optimize rendering, input, memory, and validate a real Android export on device.
 

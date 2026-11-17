@@ -402,3 +402,11 @@ A mobile-first 3D action game with precise sword combat inspired by the feel and
 - Added a dedicated guard-navigation suite (6 assertions): clear-route preservation, wall detection, lateral detour selection, forward progress, controlled velocity, no temporary-node creation, and route recovery after obstacle removal.
 - Full headless validation: 301/301 assertions across twelve suites pass. Godot 4.7.2 editor import and main-scene smoke pass; `git diff --check` passes.
 - Scope/limitations: this is local ray-probe steering, not global pathfinding or a NavigationServer3D/navmesh solution. It does not guarantee a route around large or enclosed obstacles, and it does not yet model crowd avoidance between guards. No APK or Android device validation was performed.
+
+
+## M21 — Sentinel crowd spacing and patrol coordination
+- Extended the M20 steering layer with local separation between members of the `stealth_guards` group. Nearby sentinels now contribute a distance-weighted repulsion vector that blends with their current travel direction, helping patrols and pursuits avoid occupying the same space.
+- Separation is limited to a 2.4 m radius and ignores self, non-character nodes, near-zero overlaps, and distant guards. It does not alter a guard's route when no nearby sentinel is present.
+- Added three regression assertions for near-neighbor avoidance, preserving a normalized usable travel direction with lateral spacing, and no influence beyond the separation radius.
+- Full headless validation: 304/304 assertions across twelve suites pass. Godot 4.7.2 editor import and main-scene smoke pass; `git diff --check` passes.
+- Limitations: no NavigationRegion3D/navmesh or global route planning yet. This remains local ray-probe obstacle steering plus short-range guard separation; dense groups and enclosed obstacles may still cause congestion. No APK or Android device validation was performed.
